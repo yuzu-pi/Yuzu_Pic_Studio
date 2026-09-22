@@ -4,6 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Yuzu Pic Studio</title>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-5K3V4655KD"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-5K3V4655KD');
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Gorditas:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;700&family=Yusei+Magic&family=Reggae+One&family=Shippori+Mincho:wght@400;700&family=Kiwi+Maru:wght@400;500&family=Dela+Gothic+One&family=Hachi+Maru+Pop&family=Yomogi&family=Potta+One&family=Stick&family=RocknRoll+One&family=Kaisei+Decol:wght@400;700&display=swap" rel="stylesheet" />
@@ -185,9 +193,12 @@
     .category-panel {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
       background: #ffffff; border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.16);
-      max-height: 60vh; overflow-y: auto; margin: 0 !important;
+      max-height: 46vh; overflow-y: auto; margin: 0 !important;
       padding: 22px 16px calc(var(--nav-h, 78px) + 8px);
       transform: translateY(100%); transition: transform 0.22s ease, max-height 0.22s ease;
+      
+      -webkit-mask-image: -webkit-radial-gradient(white, black);
+      mask-image: radial-gradient(white, black);
     }
     .category-panel:not([hidden]) { transform: translateY(0); }
     
@@ -670,15 +681,6 @@
 
   footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--text-muted); font-size: 0.78rem; line-height: 1.7; }
 </style>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-5K3V4655KD"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-5K3V4655KD');
-</script>
 </head>
 <body>
 
@@ -1486,6 +1488,7 @@ categoryTabs.forEach(btn => {
   btn.addEventListener("click", () => {
     if (btn.disabled) return;
     activeCategory = btn.dataset.category;
+    panelCollapsed = false;
     if (activeCategory === "text" && textEnabled) {
       canvasInteractionMode = "text";
     } else if (activeCategory === "effects" && effectTabOpen === "speedlines" && speedLinesEnabled) {
@@ -1978,32 +1981,48 @@ function buildEffectLayer(w, h, source) {
     gctx.drawImage(small, 0, 0, smallW, smallH, 0, 0, w, h);
     return big;
   }
-  const pad = Math.ceil(blurStrength * 2) + 2;
-  const padded = document.createElement("canvas");
-  padded.width = w + pad * 2;
-  padded.height = h + pad * 2;
-  const pctx = padded.getContext("2d");
-  pctx.drawImage(source, 0, 0, w, h, pad, pad, w, h);
-  pctx.drawImage(source, 0, 0, w, 1, pad, 0, w, pad);
-  pctx.drawImage(source, 0, h - 1, w, 1, pad, h + pad, w, pad);
-  pctx.drawImage(source, 0, 0, 1, h, 0, pad, pad, h);
-  pctx.drawImage(source, w - 1, 0, 1, h, w + pad, pad, pad, h);
-  pctx.drawImage(source, 0, 0, 1, 1, 0, 0, pad, pad);
-  pctx.drawImage(source, w - 1, 0, 1, 1, w + pad, 0, pad, pad);
-  pctx.drawImage(source, 0, h - 1, 1, 1, 0, h + pad, pad, pad);
-  pctx.drawImage(source, w - 1, h - 1, 1, 1, w + pad, h + pad, pad, pad);
-  const blurredPadded = document.createElement("canvas");
-  blurredPadded.width = padded.width;
-  blurredPadded.height = padded.height;
-  const bpctx = blurredPadded.getContext("2d");
-  bpctx.filter = `blur(${blurStrength}px)`;
-  bpctx.drawImage(padded, 0, 0);
-  bpctx.filter = "none";
-  const effect = document.createElement("canvas");
-  effect.width = w;
-  effect.height = h;
-  effect.getContext("2d").drawImage(blurredPadded, pad, pad, w, h, 0, 0, w, h);
-  return effect;
+  return buildScaleBlur(source, w, h, blurStrength);
+}
+
+function buildScaleBlur(source, w, h, radiusPx) {
+  if (radiusPx <= 0) {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    c.getContext("2d").drawImage(source, 0, 0, w, h);
+    return c;
+  }
+  const targetScale = Math.min(1, 1 / (radiusPx * .55));
+  let cw = w, ch = h;
+  let cur = document.createElement("canvas");
+  cur.width = cw;
+  cur.height = ch;
+  const firstCtx = cur.getContext("2d");
+  firstCtx.imageSmoothingEnabled = true;
+  if ("imageSmoothingQuality" in firstCtx) firstCtx.imageSmoothingQuality = "high";
+  firstCtx.drawImage(source, 0, 0, w, h, 0, 0, cw, ch);
+  while (cw * targetScale < cw / 2 && cw > 4 && ch > 4) {
+    const nw = Math.max(2, Math.round(cw / 2));
+    const nh = Math.max(2, Math.round(ch / 2));
+    const next = document.createElement("canvas");
+    next.width = nw;
+    next.height = nh;
+    const nctx = next.getContext("2d");
+    nctx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in nctx) nctx.imageSmoothingQuality = "high";
+    nctx.drawImage(cur, 0, 0, cw, ch, 0, 0, nw, nh);
+    cur = next;
+    cw = nw;
+    ch = nh;
+  }
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const octx = out.getContext("2d");
+  octx.imageSmoothingEnabled = true;
+  if ("imageSmoothingQuality" in octx) octx.imageSmoothingQuality = "high";
+  octx.drawImage(cur, 0, 0, cw, ch, 0, 0, w, h);
+  return out;
 }
 
 function seededRand(i) {
@@ -2061,15 +2080,47 @@ function buildBrightnessMaskCanvas(w, h) {
   return c;
 }
 
-function buildBrightnessFilterString() {
-  if (brightnessPreset === "none") return "none";
+function applyBrightnessAdjust(source, w, h) {
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const octx = out.getContext("2d");
+  octx.drawImage(source, 0, 0, w, h);
+  if (brightnessPreset === "none") return out;
   const p = BRIGHTNESS_PRESETS[brightnessPreset];
   const t = brightnessIntensity / 100;
-  const b = 1 + (p.brightness - 1) * t;
-  const c = 1 + (p.contrast - 1) * t;
-  const s = 1 + (p.saturate - 1) * t;
+  const bMul = 1 + (p.brightness - 1) * t;
+  const cMul = 1 + (p.contrast - 1) * t;
+  const sMul = 1 + (p.saturate - 1) * t;
   const se = p.sepia * t;
-  return `brightness(${b}) contrast(${c}) saturate(${s}) sepia(${se})`;
+  const imgData = octx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i], g = d[i + 1], b = d[i + 2];
+    r *= bMul;
+    g *= bMul;
+    b *= bMul;
+    r = (r - 128) * cMul + 128;
+    g = (g - 128) * cMul + 128;
+    b = (b - 128) * cMul + 128;
+    const gray = .213 * r + .715 * g + .072 * b;
+    r = gray + (r - gray) * sMul;
+    g = gray + (g - gray) * sMul;
+    b = gray + (b - gray) * sMul;
+    if (se > 0) {
+      const sr = .393 * r + .769 * g + .189 * b;
+      const sg = .349 * r + .686 * g + .168 * b;
+      const sb = .272 * r + .534 * g + .131 * b;
+      r += (sr - r) * se;
+      g += (sg - g) * se;
+      b += (sb - b) * se;
+    }
+    d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
+    d[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g;
+    d[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+  }
+  octx.putImageData(imgData, 0, 0);
+  return out;
 }
 
 function isColorLight(hex) {
@@ -2117,17 +2168,17 @@ function getRenderSource(opts = {}) {
   out.height = h;
   const octx = out.getContext("2d");
   const applyToWhole = brightnessPreset !== "none" && brightnessRange === "whole";
-  octx.filter = applyToWhole ? buildBrightnessFilterString() : "none";
-  octx.drawImage(loadedImage, 0, 0, w, h);
-  octx.filter = "none";
+  if (applyToWhole) {
+    octx.drawImage(applyBrightnessAdjust(loadedImage, w, h), 0, 0);
+  } else {
+    octx.drawImage(loadedImage, 0, 0, w, h);
+  }
   if (brightnessPreset !== "none" && brightnessRange !== "whole" && autoSubjectMaskCanvas) {
     const filtered = document.createElement("canvas");
     filtered.width = w;
     filtered.height = h;
     const fctx = filtered.getContext("2d");
-    fctx.filter = buildBrightnessFilterString();
-    fctx.drawImage(loadedImage, 0, 0, w, h);
-    fctx.filter = "none";
+    fctx.drawImage(applyBrightnessAdjust(loadedImage, w, h), 0, 0);
     fctx.globalCompositeOperation = "destination-in";
     fctx.drawImage(buildBrightnessMaskCanvas(w, h), 0, 0);
     fctx.globalCompositeOperation = "source-over";
@@ -3523,19 +3574,20 @@ previewStage.addEventListener("pointerdown", e => {
   textDragging = true;
   handle.setPointerCapture(e.pointerId);
   e.stopPropagation();
+  beginLiveOverlay();
 });
 
 previewStage.addEventListener("pointermove", e => {
   if (!textDragging || draggingTextIndex < 0) return;
   setTextPositionFromEvent(e, draggingTextIndex);
-  scheduleBlurPreviewUpdate();
+  scheduleLiveDraw();
 });
 
 previewStage.addEventListener("pointerup", () => {
   if (!textDragging) return;
   textDragging = false;
   draggingTextIndex = -1;
-  updateBlurPreview();
+  endLiveOverlay();
 });
 
 textHitarea.addEventListener("pointerdown", e => {
