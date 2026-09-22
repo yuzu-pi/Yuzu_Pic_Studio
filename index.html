@@ -1,0 +1,4183 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Yuzu Pic Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Gorditas:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;700&family=Yusei+Magic&family=Reggae+One&family=Shippori+Mincho:wght@400;700&family=Kiwi+Maru:wght@400;500&family=Dela+Gothic+One&family=Hachi+Maru+Pop&family=Yomogi&family=Potta+One&family=Stick&family=RocknRoll+One&family=Kaisei+Decol:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --page-bg: #ffffff;
+    --ink: #221c30;
+    --line: #e4e1ea;
+    --accent: #a8574f;
+    --accent-stage: #d1837e;
+    --text: #2a2438;
+    --text-muted: #6f687d;   
+  --font-ui: 'Zen Kaku Gothic New', 'Noto Sans JP', 'Noto Sans', -apple-system, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+    --stage-bg: #14101c;
+    --stage-line: #362b48;
+    --stage-text: #f1ece2;
+    --stage-text-muted: #a99bc4;
+    --radius: 3px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; min-height: 100%; background: var(--page-bg); color: var(--text); font-family: var(--font-ui); }
+
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--page-bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .site-header-inner {
+    max-width: 1280px; margin: 0 auto; padding: 26px 30px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .site-header .brand-mark { display: block; color: var(--accent-stage); }
+  .site-header h1 {
+    margin: 0; font-family: 'Gorditas', sans-serif; font-weight: 700;
+    font-size: 1.4rem; letter-spacing: 0.01em; color: var(--ink);
+  }
+
+  .shell { max-width: 1280px; margin: 0 auto; padding: 38px 30px 70px; }
+
+  .tagline { margin: 0 0 24px; color: var(--text-muted); font-size: 0.86rem; max-width: 60ch; line-height: 1.6; }
+
+  .editor { display: grid; grid-template-columns: 1fr; gap: 30px; }
+  @media (min-width: 900px) { .editor { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+
+  .canvas-pane { min-width: 0; }
+
+  .dropzone {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    min-height: 360px; position: relative; border: none; border-radius: 10px; cursor: pointer;
+    text-align: center; padding: 40px 20px; transition: background 0.15s;
+    background: var(--stage-bg); color: var(--stage-text-muted);
+  }
+  .dropzone::before {
+    content: ""; position: absolute; inset: 14px; border: 2px dashed var(--stage-line);
+    border-radius: 8px; pointer-events: none; transition: border-color 0.15s;
+  }
+  .dropzone:hover, .dropzone.is-drag { background: #1a1526; }
+  .dropzone:hover::before, .dropzone.is-drag::before { border-color: var(--accent-stage); }
+  .dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  .upload-icon-wrap { position: relative; width: 56px; height: 56px; }
+  .upload-icon { width: 56px; height: 56px; color: var(--stage-text-muted); }
+  .upload-icon-badge {
+    position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 999px;
+    background: var(--accent-stage); color: #221a10; display: flex; align-items: center; justify-content: center;
+  }
+  .upload-caption { margin: 0; color: var(--stage-text-muted); font-size: 0.78rem; }
+
+  #preview-shell { background: transparent; }
+  
+  #live-overlay { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: none; }
+  #preview-shell[hidden] { display: none; }
+
+  .preview-stage {
+    position: relative; display: block; line-height: 0; touch-action: none; max-height: 72vh;
+    overflow: hidden; background: #0a0710; border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  #blur-paint-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; touch-action: none;
+    opacity: 0; z-index: 5;
+  }
+  
+  #blur-auto-add-canvas { display: none; }
+  .preview-stage.is-blur-painting #blur-paint-canvas { pointer-events: auto; cursor: crosshair; }
+
+  #blur-brush-cursor {
+    position: absolute; border-radius: 999px; border: 2px solid var(--accent-stage);
+    background: rgba(209, 131, 126, 0.16); pointer-events: none; transform: translate(-50%, -50%);
+    display: none; z-index: 30;
+  }
+  #blur-brush-cursor::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; border-radius: 999px;
+    background: var(--accent-stage); transform: translate(-50%, -50%);
+  }
+
+  #speedlines-hitarea { position: absolute; inset: 0; pointer-events: none; cursor: crosshair; touch-action: none; z-index: 5; }
+  .preview-stage.is-speedlines-active #speedlines-hitarea { pointer-events: auto; }
+  .guide, .group-handle, .nub-btn, .crop-handle, .free-crop-window { z-index: 20; }
+  
+  
+  
+  
+
+  .preview-stage.is-hiding-handles .guide, .preview-stage.is-hiding-handles .group-handle,
+  .preview-stage.is-hiding-handles .nub-btn, .preview-stage.is-hiding-handles .crop-handle,
+  .preview-stage.is-hiding-handles .free-crop-window, .preview-stage.is-hiding-handles .mask-dim,
+  .preview-stage.is-hiding-handles .crop-window { opacity: 0; pointer-events: none; }
+  .preview-stage.is-hiding-handles #speedlines-center-handle,
+  .preview-stage.is-hiding-handles .text-position-handle-dyn { opacity: 0; pointer-events: none; }
+
+  #text-hitarea { position: absolute; inset: 0; pointer-events: none; cursor: crosshair; touch-action: none; z-index: 5; }
+  .preview-stage.is-text-active #text-hitarea { pointer-events: auto; }
+  
+  
+  
+  
+
+  .canvas-mode-bar { display: flex; align-items: center; gap: 12px; margin: 14px 4px 4px; flex-wrap: wrap; }
+  .canvas-mode-bar[hidden] { display: none; }
+  .canvas-mode-label { font-size: 0.78rem; color: var(--text-muted); flex-shrink: 0; }
+  .canvas-mode-tabs, .seg-tabs { display: flex; gap: 2px; background: #f4f2ee; border-radius: 8px; padding: 3px; }
+  .cm-tab, .seg-tab {
+    padding: 6px 13px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-muted);
+    font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: background 0.12s, color 0.12s;
+  }
+  .cm-tab.is-active, .seg-tab.is-active { font-weight: 600; }
+  .cm-tab[hidden] { display: none; }
+  
+  .seg-tabs { width: 100%; }
+  .seg-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 10px; }
+  .seg-tab svg { width: 20px; height: 15px; flex-shrink: 0; }
+  .seg-tab.is-active svg { color: var(--accent-stage); }
+  .seg-tab .effect-dot { margin: 0; }
+  .cm-tab.is-active, .seg-tab.is-active { background: #ffffff; color: var(--ink); border-color: var(--line); }
+  .cm-tab:hover:not(.is-active), .seg-tab:hover:not(.is-active) { color: var(--ink); }
+
+  .effect-panel { display: flex; flex-direction: column; gap: 30px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .effect-panel[hidden] { display: none; }
+  .effect-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: var(--accent-stage);
+    margin-left: 6px; vertical-align: middle;
+  }
+  .effect-dot[hidden] { display: none; }
+
+  
+  .category-nav { display: flex; gap: 8px; margin: 0 0 4px; }
+  .cat-tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 6px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff;
+    cursor: pointer; font: inherit; color: var(--text-muted); position: relative; transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .cat-tab svg { width: 17px; height: 17px; }
+  .cat-tab span:not(.effect-dot) { font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
+  .cat-tab.is-active span:not(.effect-dot), .cat-tab.is-export span:not(.effect-dot) { font-weight: 600; }
+  .cat-tab:hover:not(.is-active):not(:disabled) { border-color: var(--accent-stage); color: var(--ink); }
+  .cat-tab.is-active { background: var(--accent-stage); color: #ffffff; border-color: var(--accent-stage); }
+  .cat-tab .effect-dot { position: absolute; top: 8px; right: 10px; margin: 0; }
+  .cat-tab:disabled { opacity: 0.4; cursor: not-allowed; }
+  .cat-tab.is-export { display: none; }
+
+  .category-panel[hidden] { display: none; }
+
+  .mobile-scroll-fade { display: none; }
+  .panel-grip { display: none; }
+
+  @media (max-width: 899px) {
+    .category-nav {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; margin: 0;
+      background: #ffffff; border-top: 1px solid var(--line); gap: 0;
+      padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+    }
+    .cat-tab { border: none; border-radius: 10px; background: transparent; padding-left: 2px; padding-right: 2px; }
+    .cat-tab.is-active { background: var(--bg-tint, rgba(209, 131, 126, 0.12)); color: var(--accent-stage); }
+    .cat-tab.is-export { display: flex; }
+
+    .category-panel[hidden] { display: block; }
+    .category-panel {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
+      background: #ffffff; border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.16);
+      max-height: 60vh; overflow-y: auto; margin: 0 !important;
+      padding: 22px 16px calc(var(--nav-h, 78px) + 8px);
+      transform: translateY(100%); transition: transform 0.22s ease, max-height 0.22s ease;
+    }
+    .category-panel:not([hidden]) { transform: translateY(0); }
+    
+    .category-panel.is-collapsed { max-height: calc(var(--nav-h, 78px) + 38px); overflow: hidden; }
+    
+    .panel-grip {
+      position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; width: 100%;
+      margin: 0; padding: 14px 0 6px; background: #ffffff; border: none; cursor: pointer; touch-action: none;
+    }
+    .panel-grip[hidden] { display: none; }
+    .panel-grip-bar { width: 36px; height: 4px; border-radius: 999px; background: var(--line); transition: background 0.15s; }
+    .panel-grip:hover .panel-grip-bar, .panel-grip:active .panel-grip-bar { background: var(--accent-stage); }
+    .mobile-scroll-fade {
+      display: block; position: fixed; left: 0; right: 0; z-index: 56; height: 22px; pointer-events: none;
+      bottom: var(--nav-h, 70px);
+      background: linear-gradient(to bottom, rgba(255,255,255,0), #ffffff);
+    }
+    .mobile-scroll-fade[hidden] { display: none; }
+    .cat-tab.is-export {
+      background: var(--accent-stage); color: #ffffff; border: none; flex: 0 0 auto; padding: 10px 18px;
+    }
+  }
+
+  
+  .preview-stage:not([data-category="crop"]) .guide,
+  .preview-stage:not([data-category="crop"]) .group-handle,
+  .preview-stage:not([data-category="crop"]) .nub-btn,
+  .preview-stage:not([data-category="crop"]) .crop-handle,
+  .preview-stage:not([data-category="crop"]) .free-crop-window {
+    display: none;
+  }
+
+  
+  .preview-stage[data-canvas-mode="blur"] .guide, .preview-stage[data-canvas-mode="blur"] .group-handle,
+  .preview-stage[data-canvas-mode="blur"] .nub-btn, .preview-stage[data-canvas-mode="blur"] .crop-handle,
+  .preview-stage[data-canvas-mode="blur"] .free-crop-window,
+  .preview-stage[data-canvas-mode="speedlines"] .guide, .preview-stage[data-canvas-mode="speedlines"] .group-handle,
+  .preview-stage[data-canvas-mode="speedlines"] .nub-btn, .preview-stage[data-canvas-mode="speedlines"] .crop-handle,
+  .preview-stage[data-canvas-mode="speedlines"] .free-crop-window,
+  .preview-stage[data-canvas-mode="text"] .guide, .preview-stage[data-canvas-mode="text"] .group-handle,
+  .preview-stage[data-canvas-mode="text"] .nub-btn, .preview-stage[data-canvas-mode="text"] .crop-handle,
+  .preview-stage[data-canvas-mode="text"] .free-crop-window {
+    display: none;
+  }
+  .preview-stage[data-canvas-mode="split"] #blur-paint-canvas,
+  .preview-stage[data-canvas-mode="speedlines"] #blur-paint-canvas,
+  .preview-stage[data-canvas-mode="text"] #blur-paint-canvas { pointer-events: none !important; }
+  .preview-stage[data-canvas-mode="split"] #speedlines-hitarea,
+  .preview-stage[data-canvas-mode="blur"] #speedlines-hitarea,
+  .preview-stage[data-canvas-mode="text"] #speedlines-hitarea { pointer-events: none !important; }
+  .preview-stage[data-canvas-mode="split"] #speedlines-center-handle,
+  .preview-stage[data-canvas-mode="blur"] #speedlines-center-handle,
+  .preview-stage[data-canvas-mode="text"] #speedlines-center-handle { display: none !important; }
+  .preview-stage[data-canvas-mode="split"] #text-hitarea,
+  .preview-stage[data-canvas-mode="blur"] #text-hitarea,
+  .preview-stage[data-canvas-mode="speedlines"] #text-hitarea { pointer-events: none !important; }
+  .preview-stage[data-canvas-mode="split"] .text-position-handle-dyn,
+  .preview-stage[data-canvas-mode="blur"] .text-position-handle-dyn,
+  .preview-stage[data-canvas-mode="speedlines"] .text-position-handle-dyn { display: none !important; }
+
+  .blur-boundary-h {
+    position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed #fff;
+    mix-blend-mode: difference; pointer-events: none;
+  }
+  .blur-boundary-circle {
+    position: absolute; border: 2px dashed #fff; border-radius: 50%;
+    mix-blend-mode: difference; pointer-events: none;
+  }
+  #preview-img { display: block; width: 100%; height: auto; max-height: 72vh; object-fit: contain; margin: 0 auto; background: #0a0710; }
+
+  
+  .guide, .group-handle {
+    position: absolute; top: 0; bottom: 0; width: 22px; margin: 0;
+    background: transparent; border: none; padding: 0; cursor: col-resize; touch-action: none;
+    transform: translateX(-50%);
+  }
+  .guide::before, .group-handle::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
+    background: #ffffff; mix-blend-mode: difference; transform: translateX(-50%); transition: width 0.1s;
+  }
+  .guide:hover::before, .guide:focus-visible::before { width: 3px; }
+  .group-handle:hover::before, .group-handle:focus-visible::before { width: 3px; }
+
+  .guide.is-row {
+    top: auto; bottom: auto; left: 0; right: 0; width: auto; height: 22px;
+    cursor: row-resize; transform: translateY(-50%);
+  }
+  .guide.is-row::before { top: 50%; bottom: auto; left: 0; right: 0; height: 2px; width: auto; transform: translateY(-50%); }
+  .guide.is-row:hover::before { height: 3px; }
+
+  
+  
+  
+  
+  
+  .guide.is-static { pointer-events: none; }
+  .guide.is-static::before { background: rgba(255, 255, 255, 0.55); mix-blend-mode: difference; }
+  .guide.is-static::after { display: none; }
+  .guide:focus-visible, .group-handle:focus-visible { outline: 2px solid var(--accent-stage); outline-offset: 2px; }
+
+  
+  .crop-handle {
+    position: absolute; width: 26px; height: 26px; padding: 0; margin: 0; border: none; background: transparent; outline: none;
+    touch-action: none; transform: translate(-50%, -50%); --hc: #ffffff;
+  }
+  @media (pointer: coarse) { .crop-handle { width: 36px; height: 36px; } }
+  .crop-handle::before {
+    content: ""; position: absolute; box-sizing: border-box; left: calc(50% + var(--ox, 0px)); top: calc(50% + var(--oy, 0px));
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.65)); transition: filter 0.1s;
+  }
+  .crop-handle:hover, .crop-handle:focus-visible, .crop-handle:active { --hc: var(--accent-stage); }
+  .crop-handle:focus-visible::before { filter: drop-shadow(0 0 3px rgba(209, 131, 126, 0.95)); }
+  .crop-handle[data-role="fcrop-tl"]::before, .crop-handle[data-role="fcrop-tr"]::before,
+  .crop-handle[data-role="fcrop-bl"]::before, .crop-handle[data-role="fcrop-br"]::before {
+    width: 20px; height: 20px; border: 3px solid var(--hc); border-radius: 2px;
+  }
+  .crop-handle[data-role="fcrop-tl"]::before { border-right: 0; border-bottom: 0; }
+  .crop-handle[data-role="fcrop-tr"]::before { border-left: 0; border-bottom: 0; transform: translate(-100%, 0); }
+  .crop-handle[data-role="fcrop-bl"]::before { border-right: 0; border-top: 0; transform: translate(0, -100%); }
+  .crop-handle[data-role="fcrop-br"]::before { border-left: 0; border-top: 0; transform: translate(-100%, -100%); }
+  .crop-handle[data-role="fcrop-top"]::before, .crop-handle[data-role="fcrop-bottom"]::before { width: 26px; height: 3px; background: var(--hc); border-radius: 2px; }
+  .crop-handle[data-role="fcrop-left"]::before, .crop-handle[data-role="fcrop-right"]::before { width: 3px; height: 26px; background: var(--hc); border-radius: 2px; }
+  .crop-handle[data-role="fcrop-top"]::before { transform: translate(-50%, 0); }
+  .crop-handle[data-role="fcrop-bottom"]::before { transform: translate(-50%, -100%); }
+  .crop-handle[data-role="fcrop-left"]::before { transform: translate(0, -50%); }
+  .crop-handle[data-role="fcrop-right"]::before { transform: translate(-100%, -50%); }
+  
+  .crop-handle::after { content: ""; position: absolute; left: calc(50% + var(--ox, 0px)); top: calc(50% + var(--oy, 0px)); }
+  .crop-handle[data-role="fcrop-tl"]::after, .crop-handle[data-role="fcrop-tr"]::after,
+  .crop-handle[data-role="fcrop-bl"]::after, .crop-handle[data-role="fcrop-br"]::after { width: 28px; height: 28px; }
+  .crop-handle[data-role="fcrop-top"]::after, .crop-handle[data-role="fcrop-bottom"]::after { width: 40px; height: 18px; }
+  .crop-handle[data-role="fcrop-left"]::after, .crop-handle[data-role="fcrop-right"]::after { width: 18px; height: 40px; }
+  .crop-handle[data-role="fcrop-tr"]::after { transform: translate(-100%, 0); }
+  .crop-handle[data-role="fcrop-bl"]::after { transform: translate(0, -100%); }
+  .crop-handle[data-role="fcrop-br"]::after { transform: translate(-100%, -100%); }
+  .crop-handle[data-role="fcrop-top"]::after { transform: translate(-50%, 0); }
+  .crop-handle[data-role="fcrop-bottom"]::after { transform: translate(-50%, -100%); }
+  .crop-handle[data-role="fcrop-left"]::after { transform: translate(0, -50%); }
+  .crop-handle[data-role="fcrop-right"]::after { transform: translate(-100%, -50%); }
+
+  
+  .guide::after, .group-handle::after {
+    content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box;
+    width: 16px; height: 34px; padding: 9.5px 6px; border-radius: 6px; --dot: #8f89a0;
+    background: radial-gradient(circle, var(--dot) 1.3px, transparent 1.7px) 0 0 / 4px 5px repeat content-box content-box, #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .guide.is-row::after {
+    width: 34px; height: 16px; padding: 6px 9.5px;
+    background: radial-gradient(circle, var(--dot) 1.3px, transparent 1.7px) 0 0 / 5px 4px repeat content-box content-box, #ffffff;
+  }
+  .guide:hover::after, .guide:focus-visible::after, .group-handle:hover::after, .group-handle:focus-visible::after {
+    --dot: var(--accent-stage); transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+  }
+
+  
+  .nub-btn {
+    position: absolute; width: 28px; height: 28px; padding: 0; border: none; border-radius: 999px; background: rgba(255, 255, 255, 0.94);
+    cursor: move; touch-action: none; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); transition: background 0.1s; --chev: #221c30;
+  }
+  .nub-btn:hover, .nub-btn:focus-visible, .nub-btn:active { background: var(--accent-stage); --chev: #ffffff; }
+  .nub-btn:focus-visible { outline: 2px solid var(--accent-stage); outline-offset: 2px; }
+  .nub-btn.is-vert { cursor: ns-resize; }
+  .chev { display: none; }
+  .nub-btn::before {
+    content: ""; width: 14px; height: 14px; background: var(--chev);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+
+  
+  .text-position-handle-dyn {
+    position: absolute; width: 24px; height: 24px; padding: 0; border: none; border-radius: 999px; background: #ffffff; color: #221c30;
+    transform: translate(-50%, calc(-50% - 26px)); display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none;
+    font-family: var(--font-ui); font-size: 12px; font-weight: 700; line-height: 1; z-index: 32;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); transition: background 0.1s, color 0.1s;
+  }
+  .text-position-handle-dyn:active { cursor: grabbing; }
+  .text-position-handle-dyn::after {
+    content: ""; position: absolute; left: 50%; bottom: -7px; width: 2px; height: 7px; background: #ffffff; transform: translateX(-50%);
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+  }
+  .text-position-handle-dyn.is-active { background: var(--accent-stage); color: #ffffff; }
+  .text-position-handle-dyn.is-active::after { background: var(--accent-stage); }
+
+  
+  #speedlines-center-handle {
+    position: absolute; width: 28px; height: 28px; border-radius: 999px; border: 1.5px solid #ffffff; background: transparent;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.6), inset 0 0 3px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -50%); pointer-events: none; display: none; z-index: 31;
+  }
+  #speedlines-center-handle::before, #speedlines-center-handle::after { content: ""; position: absolute; background: #ffffff; box-shadow: 0 0 2px rgba(0, 0, 0, 0.5); }
+  #speedlines-center-handle::before { left: 50%; top: 6px; bottom: 6px; width: 1.5px; transform: translateX(-50%); }
+  #speedlines-center-handle::after { top: 50%; left: 6px; right: 6px; height: 1.5px; transform: translateY(-50%); }
+  
+  
+  
+  .nub-btn.is-disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+  
+
+  
+  
+  
+  
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  .mask-dim { position: absolute; background: rgba(4, 3, 8, 0.66); pointer-events: none; }
+  .mask-dim.is-top, .mask-dim.is-bottom { left: 0; right: 0; }
+  .mask-dim.is-left, .mask-dim.is-right { top: 0; bottom: 0; }
+  .crop-window { position: absolute; left: 0; right: 0; border-top: 1px solid #ffffff; border-bottom: 1px solid #ffffff; mix-blend-mode: difference; pointer-events: none; }
+
+  .free-crop-window { position: absolute; border: 1px solid #ffffff; mix-blend-mode: difference; background: rgba(255, 255, 255, 0.04); cursor: move; touch-action: none; }
+
+  
+  
+  
+
+  .control-pane { display: flex; flex-direction: column; gap: 26px; position: relative; }
+  @media (min-width: 900px) {
+    .canvas-pane { position: sticky; top: 117px; align-self: start; }
+    .control-pane { position: sticky; top: 117px; align-self: start; }
+  }
+  .control-pane.is-disabled .field-row select,
+  .control-pane.is-disabled .slider-field input,
+  .control-pane.is-disabled .actions button,
+  .control-pane.is-disabled .color-swatch,
+  .control-pane.is-disabled .font-swatch { opacity: 0.4; }
+  .control-pane.is-disabled .field-row,
+  .control-pane.is-disabled .slider-field { opacity: 0.55; }
+
+  .field-group { display: flex; flex-direction: column; gap: 30px; }
+  .field-group[hidden] { display: none; }
+
+  .field-row { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 12px; }
+  .field-row[hidden] { display: none; }
+  .field-row label { color: var(--ink); font-size: 0.85rem; font-weight: 600; }
+  .field-row select {
+    width: 100%; padding: 8px 34px 8px 12px; background: #ffffff; border: 1px solid var(--line);
+    border-radius: 10px; color: var(--text); font: inherit; font-weight: 500; font-size: 0.84rem;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23857f92' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+    transition: border-color 0.12s;
+  }
+  .field-row select:hover:not(:disabled) { border-color: var(--accent-stage); }
+  .field-row select:focus-visible { outline: 2px solid var(--accent-stage); outline-offset: 2px; }
+  .field-row select:disabled { background-color: #faf9f7; color: var(--text-muted); border-color: var(--line); cursor: not-allowed; }
+
+
+  .mode-pills { display: flex; flex-direction: row; gap: 10px; }
+  @media (max-width: 560px) { .mode-pills { flex-direction: column; } }
+
+  .group-label { margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0; }
+
+  .mode-pills--compact { gap: 6px; }
+  .mode-pills--compact .seg-btn { flex: 0 0 auto; padding: 6px 16px; font-size: 0.76rem; }
+
+  .split-icon-field { display: flex; flex-direction: column; gap: 10px; }
+  .split-icon-field[hidden] { display: none; }
+  .split-icon-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .split-icon-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 9px 4px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff;
+    cursor: pointer; font: inherit; color: var(--text-muted); min-width: 48px; max-width: 150px; flex: 1; position: relative;
+    transition: border-color 0.12s, background 0.12s, color 0.12s;
+  }
+  .split-icon-btn svg { width: 30px; height: 22px; }
+  .split-icon-btn svg rect, .split-icon-btn svg line { fill: none; stroke: currentColor; stroke-width: 1.5; }
+  .split-icon-btn span { font-size: 0.6875rem; font-weight: 500; }
+  .split-icon-btn.is-active span { font-weight: 600; }
+  .split-icon-btn:hover:not(:disabled):not(.is-active) { border-color: var(--accent-stage); color: var(--ink); }
+  .split-icon-btn.is-active { border-color: var(--accent-stage); background: rgba(209, 131, 126, 0.08); color: var(--accent-stage); }
+  .split-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .rule { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+
+  .hint { margin: 0; color: var(--text-muted); font-size: 0.75rem; line-height: 1.7; }
+  #image-size-hint b { color: var(--ink); font-weight: 600; }
+  .hint-with-icon { display: flex; align-items: center; gap: 5px; }
+  .hint-with-icon svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  
+  .toggle-card {
+    display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
+    background: #ffffff; cursor: pointer; transition: border-color 0.12s, background 0.12s;
+  }
+  .toggle-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .toggle-card-title { font-size: 0.8125rem; font-weight: 600; color: var(--ink); line-height: 1.4; }
+  .toggle-card .hint { display: block; }
+  .toggle-card .hint[hidden] { display: none; }
+  .toggle-card:has(input:not(:disabled)):hover { border-color: var(--accent-stage); }
+  .toggle-card:has(input:checked) { border-color: var(--accent-stage); background: rgba(209, 131, 126, 0.08); }
+  .toggle-card:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
+  .toggle-card:has(input:focus-visible) { outline: 2px solid var(--accent-stage); outline-offset: 2px; }
+  .toggle-card input[type="checkbox"] {
+    -webkit-appearance: none; -moz-appearance: none; appearance: none; flex: 0 0 34px; width: 34px; height: 20px; margin: 0;
+    border-radius: 999px; background: var(--line); position: relative; cursor: inherit; transition: background 0.12s;
+  }
+  .toggle-card input[type="checkbox"]::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #ffffff;
+    transition: transform 0.12s;
+  }
+  .toggle-card input[type="checkbox"]:checked { background: var(--accent-stage); }
+  .toggle-card input[type="checkbox"]:checked::after { transform: translateX(14px); }
+
+  .hint-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+
+  .link-btn {
+    background: none; border: none; padding: 0; margin: 0;
+    color: var(--accent); font: inherit; font-size: 0.76rem; text-decoration: underline;
+    cursor: pointer; white-space: nowrap;
+  }
+  .link-btn:hover { color: var(--text); }
+  .link-btn:disabled { color: var(--text-muted); text-decoration: none; cursor: not-allowed; }
+
+  .slider-field { display: flex; flex-direction: column; gap: 10px; }
+  .field-row-plain {}
+  
+  .text-input {
+    flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px;
+    font: inherit; font-size: 0.75rem; color: var(--ink); background: #ffffff; box-sizing: border-box;
+    transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .text-input::placeholder { color: var(--text-muted); }
+  .text-input:hover:not(:disabled) { border-color: var(--accent-stage); }
+  .text-input:focus-visible { outline: none; border-color: var(--accent-stage); box-shadow: 0 0 0 3px rgba(209, 131, 126, 0.18); }
+  .text-input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .text-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .control-pane.is-disabled .field-row-plain { opacity: 0.55; }
+  .slider-field[hidden] { display: none; }
+  .slider-field .slider-label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .slider-heading { margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0; }
+
+  .reset-chip {
+    flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
+    border-radius: 6px; border: 1px solid var(--line); background: #ffffff; color: var(--text-muted);
+    font: inherit; font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: border-color 0.12s, background 0.12s, color 0.12s;
+  }
+  .reset-chip svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .reset-chip:hover:not(:disabled) { border-color: var(--accent-stage); color: var(--accent); background: rgba(209, 131, 126, 0.06); }
+  .reset-chip.is-confirming, .reset-chip.is-confirming:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(168, 87, 79, 0.1); }
+  .preview-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+  .reset-chip:disabled { color: var(--text-muted); border-color: var(--line); cursor: not-allowed; }
+
+  .text-layer-chip {
+    display: flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line);
+    background: #ffffff; color: var(--text-muted); font: inherit; font-size: 0.8125rem; cursor: pointer;
+    transition: border-color 0.12s, background 0.12s, color 0.12s;
+  }
+  .text-layer-chip:hover { border-color: var(--accent-stage); }
+  .text-layer-chip.is-active { border-color: var(--accent-stage); background: rgba(209, 131, 126, 0.08); color: var(--accent-stage); font-weight: 600; }
+  .text-layer-add-btn {
+    display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px; border-radius: 6px; border: 1px dashed var(--line);
+    background: #ffffff; color: var(--text-muted); font: inherit; font-size: 0.8125rem; cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .text-layer-add-btn:hover:not(:disabled) { border-color: var(--accent-stage); color: var(--accent-stage); }
+  .text-layer-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+
+  .range-wrap { position: relative; padding: 0; }
+  
+  .slider-field input[type="range"] {
+    display: block; width: 100%; height: 28px; margin: 0; padding: 0; background: transparent;
+    appearance: none; -webkit-appearance: none; outline: none; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .slider-field input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px; border-radius: 999px;
+    background: linear-gradient(to right, var(--accent-stage) 0%, var(--accent-stage) var(--fill, 50%), var(--line) var(--fill, 50%), var(--line) 100%);
+  }
+  .slider-field input[type="range"]::-moz-range-track {
+    height: 2px; border-radius: 999px;
+    background: linear-gradient(to right, var(--accent-stage) 0%, var(--accent-stage) var(--fill, 50%), var(--line) var(--fill, 50%), var(--line) 100%);
+  }
+  .slider-field input[type="range"]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border-radius: 999px;
+    background: var(--accent); border: none; cursor: pointer; transition: box-shadow 0.12s ease;
+  }
+  .slider-field input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 999px; background: var(--accent); border: none; cursor: pointer;
+  }
+  .slider-field input[type="range"]:active::-webkit-slider-thumb { box-shadow: 0 0 0 7px rgba(168, 87, 79, 0.16); }
+  .slider-field input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(168, 87, 79, 0.28); }
+  .slider-field input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(168, 87, 79, 0.28); }
+  .slider-value {
+    margin: 0 0 0 auto; font-size: 0.75rem; font-weight: 600; color: var(--ink);
+    letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+
+  .color-swatch-row { display: flex; align-items: center; gap: 8px; padding: 3px; flex-wrap: wrap; }
+  .color-swatch {
+    position: relative; width: 28px; height: 28px; border-radius: 6px;
+    border: none; box-shadow: inset 0 0 0 1px rgba(34, 28, 48, 0.14); padding: 0; cursor: pointer; flex-shrink: 0;
+    transition: box-shadow 0.12s;
+  }
+  .color-swatch:hover:not(:disabled) { box-shadow: inset 0 0 0 1px rgba(34, 28, 48, 0.14), 0 0 0 2px #ffffff, 0 0 0 4px rgba(34, 28, 48, 0.22); }
+  .color-swatch.is-active { box-shadow: inset 0 0 0 1px rgba(34, 28, 48, 0.14), 0 0 0 2px #ffffff, 0 0 0 4px var(--ink); }
+  .color-swatch:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .color-swatch--custom {
+    display: block; overflow: hidden;
+    background: conic-gradient(from 0deg, #ff3b30, #ffcc00, #34c759, #32ade6, #5856d6, #ff2d92, #ff3b30);
+  }
+  
+  .color-swatch--custom::before, .color-swatch--custom::after {
+    content: ""; position: absolute; left: 50%; top: 50%; background: #ffffff; border-radius: 1px; pointer-events: none;
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+  }
+  .color-swatch--custom::before { width: 12px; height: 2px; transform: translate(-50%, -50%); }
+  .color-swatch--custom::after { width: 2px; height: 12px; transform: translate(-50%, -50%); }
+  .color-swatch--custom input[type="color"] {
+    position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
+    border: none; padding: 0; opacity: 0; cursor: pointer;
+  }
+  .color-swatch--custom.is-disabled { opacity: 0.4; }
+  .color-swatch--custom.is-disabled input { cursor: not-allowed; pointer-events: none; }
+
+  .font-swatch-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .font-swatch {
+    padding: 8px 14px; border: 1px solid var(--line); border-radius: 6px; background: #ffffff;
+    color: var(--text); font-size: 0.92rem; cursor: pointer; transition: border-color 0.12s, background 0.12s;
+  }
+  .font-swatch:hover:not(:disabled):not(.is-active) { border-color: var(--accent-stage); }
+  .font-swatch.is-active { border-color: var(--accent-stage); background: rgba(209, 131, 126, 0.08); color: var(--accent-stage); }
+  .font-swatch:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .actions { display: flex; flex-direction: column; gap: 8px; }
+  @media (max-width: 899px) {
+    .actions { display: none; }
+  }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px; border: none; border-radius: 10px; background: var(--accent-stage); color: #ffffff;
+    font: inherit; font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: filter 0.15s, transform 0.05s;
+  }
+  .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .btn:hover:not(:disabled) { filter: brightness(0.95); }
+  .btn:active:not(:disabled) { transform: scale(0.99); }
+  .btn:disabled { background: var(--line); color: var(--text-muted); cursor: not-allowed; }
+
+  .btn-ghost { background: #ffffff; border: 1px solid var(--line); color: var(--text-muted); font-weight: 500; }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--accent-stage); background: rgba(209, 131, 126, 0.06); color: var(--ink); }
+  .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; background: #ffffff; }
+
+  .inline-error { display: none; padding: 10px 14px; border: 1px solid #7a3b3b; background: rgba(122, 59, 59, 0.15); border-radius: var(--radius); color: #e0a9a9; font-size: 0.82rem; }
+  .inline-error.is-visible { display: block; }
+
+  #results { margin-top: 28px; }
+  #results[hidden] { display: none; }
+  #results h2 { font-weight: 700; font-size: 1.1rem; margin: 0 0 14px; color: var(--text); }
+
+  .result-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; }
+  .result-strip:last-child { margin-bottom: 0; }
+
+  .result-card { position: relative; flex: 0 0 auto; width: 150px; border: 1px solid var(--stage-line); border-radius: var(--radius); overflow: hidden; background: #0a0710; }
+  .result-card img { width: 100%; display: block; }
+
+  .dl-btn {
+    position: absolute; right: 6px; bottom: 6px; width: 30px; height: 30px; border-radius: 6px; background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center;
+    text-decoration: none; color: var(--ink); transition: background 0.12s, color 0.12s;
+  }
+  .dl-btn svg { width: 16px; height: 16px; }
+  .dl-btn:hover { background: var(--accent-stage); color: #ffffff; }
+
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--text-muted); font-size: 0.78rem; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <svg class="brand-mark" width="21" height="22" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(0 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(45 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(90 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(135 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(180 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(225 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(270 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(315 16 16)"/><circle cx="16" cy="16" r="4" fill="#ffffff"/>
+    </svg>
+    <h1>Yuzu Pic Studio</h1>
+    <svg class="brand-mark" width="21" height="22" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(0 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(45 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(90 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(135 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(180 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(225 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(270 16 16)"/><path d="M16 16 L16 3 A13 13 0 0 1 22.2 5.8 Z" transform="rotate(315 16 16)"/><circle cx="16" cy="16" r="4" fill="#ffffff"/>
+    </svg>
+  </div>
+</header>
+
+<div class="shell">
+  <p class="tagline" hidden>1枚の画像を、SNSに並べて投稿するとつながって見えるように割って書き出せます。ただ分割したいだけのときにも使えます。</p>
+
+  <div class="editor">
+    <div class="canvas-pane">
+      <label class="dropzone" id="dropzone" for="file-input">
+        <input autocomplete="off" type="file" id="file-input" accept="image/*,.heic,.heif,image/heic,image/heif" />
+        <div class="upload-icon-wrap">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 8h.01" />
+            <path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z" />
+            <path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5" />
+            <path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3" />
+          </svg>
+          <span class="upload-icon-badge" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+        </div>
+        <p class="upload-caption">ドラッグ&amp;ドロップ、または写真を選択</p>
+      </label>
+
+      <div id="preview-shell" hidden>
+        <div class="preview-toolbar">
+          <button type="button" class="reset-chip" id="reset-btn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 8 8 8"/></svg><span>はじめからやり直す</span></button>
+        </div>
+        <div class="preview-stage" id="preview-stage">
+          <img id="preview-img" alt="preview" />
+          <canvas id="live-overlay" aria-hidden="true"></canvas>
+          <canvas id="blur-paint-canvas"></canvas>
+          <canvas id="blur-auto-add-canvas"></canvas>
+          <div id="blur-brush-cursor"></div>
+          <div id="speedlines-hitarea"></div>
+          <div id="speedlines-center-handle"></div>
+          <div id="text-hitarea"></div>
+        </div>
+        <div class="canvas-mode-bar" id="canvas-mode-bar" hidden>
+          <span class="canvas-mode-label">キャンバス操作:</span>
+          <div class="canvas-mode-tabs" id="canvas-mode-tabs" role="group" aria-label="キャンバス操作の対象">
+            <button type="button" class="cm-tab is-active" data-canvas-mode="split">分割位置</button>
+            <button type="button" class="cm-tab" data-canvas-mode="blur" hidden>ぼかし範囲</button>
+            <button type="button" class="cm-tab" data-canvas-mode="speedlines" hidden>集中線位置</button>
+            <button type="button" class="cm-tab" data-canvas-mode="text" hidden>文字位置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="control-pane is-disabled" id="workspace">
+      <div class="mobile-scroll-fade" id="mobile-scroll-fade" hidden></div>
+      <button type="button" class="panel-grip" id="panel-grip" hidden aria-label="パネルの開閉を切り替え">
+        <span class="panel-grip-bar"></span>
+      </button>
+
+      <div class="category-nav" id="category-nav" role="tablist" aria-label="編集カテゴリ">
+        <button type="button" class="cat-tab is-active" data-category="crop" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+          <span>切り抜き</span>
+        </button>
+        <button type="button" class="cat-tab" data-category="effects" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18 18 6"/><path d="M15 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>
+          <span>エフェクト</span>
+          <span class="effect-dot" id="effects-nav-dot" hidden></span>
+        </button>
+        <button type="button" class="cat-tab" data-category="text" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 4 16 20 M6.5 14 13.5 14"/></svg>
+          <span>文字</span>
+          <span class="effect-dot" id="text-nav-dot" hidden></span>
+        </button>
+        <button type="button" class="cat-tab" data-category="brightness" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+          <span>明るさ</span>
+          <span class="effect-dot" id="brightness-nav-dot" hidden></span>
+        </button>
+        <button type="button" class="cat-tab is-export" id="mobile-export-btn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg>
+          <span>書き出す</span>
+        </button>
+      </div>
+
+      <div class="category-panel" id="category-panel-crop" data-category-panel="crop">
+      <div class="field-group" id="field-group-1">
+        <p class="hint hint-with-icon" id="image-size-hint" hidden></p>
+        <div class="split-icon-field">
+          <label class="group-label">横分割</label>
+          <div class="split-icon-row" id="cols-icon-row">
+            <button type="button" class="split-icon-btn" data-cols="1" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/></svg>
+              <span>なし</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-cols="2" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="16" y1="1" x2="16" y2="23"/></svg>
+              <span>2列</span>
+            </button>
+            <button type="button" class="split-icon-btn is-active" data-cols="3" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="11" y1="1" x2="11" y2="23"/><line x1="21" y1="1" x2="21" y2="23"/></svg>
+              <span>3列</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-cols="4" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="8.5" y1="1" x2="8.5" y2="23"/><line x1="16" y1="1" x2="16" y2="23"/><line x1="23.5" y1="1" x2="23.5" y2="23"/></svg>
+              <span>4列</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-cols="5" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="7" y1="1" x2="7" y2="23"/><line x1="13" y1="1" x2="13" y2="23"/><line x1="19" y1="1" x2="19" y2="23"/><line x1="25" y1="1" x2="25" y2="23"/></svg>
+              <span>5列</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-cols="6" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="6" y1="1" x2="6" y2="23"/><line x1="11" y1="1" x2="11" y2="23"/><line x1="16" y1="1" x2="16" y2="23"/><line x1="21" y1="1" x2="21" y2="23"/><line x1="26" y1="1" x2="26" y2="23"/></svg>
+              <span>6列</span>
+            </button>
+          </div>
+        </div>
+        <select autocomplete="off" id="cols" disabled hidden>
+          <option value="1">分割なし</option>
+          <option value="2">2列</option>
+          <option value="3" selected>3列</option>
+          <option value="4">4列</option>
+          <option value="5">5列</option>
+          <option value="6">6列</option>
+        </select>
+
+        <label class="toggle-card" id="sns-mode-toggle-row">
+          <span class="toggle-card-head">
+            <span class="toggle-card-title">SNS投稿用に複数分割で並べる</span>
+            <input autocomplete="off" type="checkbox" id="sns-mode-toggle" disabled />
+          </span>
+          <span class="hint" id="sns-mode-hint">複数の画像に分割し、SNSに並べて投稿するとつながって見えるように自動でトリミングします(2〜4列のみ対応)。</span>
+        </label>
+
+        <div class="slider-field" id="crop-ratio-row" hidden>
+          <div class="slider-label">
+            <h3 class="slider-heading">上下トリミング量</h3>
+            <button type="button" class="reset-chip" id="reset-crop-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 8 8 8"/></svg><span>既定値に戻す</span></button>
+          </div>
+          <output id="crop-ratio-value" hidden>2.04</output>
+          <div class="range-wrap">
+            <input autocomplete="off" type="range" id="crop-ratio" data-scale="0.01" data-decimals="2" data-unit=":1" min="120" max="260" value="204" />
+          </div>
+          <p class="hint">数値を上げるほど、プレビューで暗く示された上下の範囲が広がります(横に長い画像を大きくカットします)。プレビューの暗い部分が、実際にカットされる範囲です。</p>
+        </div>
+
+        <div class="split-icon-field" id="rows-row" hidden>
+          <label class="group-label">縦分割</label>
+          <div class="split-icon-row" id="rows-icon-row">
+            <button type="button" class="split-icon-btn is-active" data-rows="1" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/></svg>
+              <span>なし</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-rows="2" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="1" y1="12" x2="31" y2="12"/></svg>
+              <span>2行</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-rows="3" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="1" y1="8.3" x2="31" y2="8.3"/><line x1="1" y1="15.7" x2="31" y2="15.7"/></svg>
+              <span>3行</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-rows="4" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3"/><line x1="1" y1="6.5" x2="31" y2="6.5"/><line x1="1" y1="12" x2="31" y2="12"/><line x1="1" y1="17.5" x2="31" y2="17.5"/></svg>
+              <span>4行</span>
+            </button>
+          </div>
+        </div>
+        <select autocomplete="off" id="rows" disabled hidden>
+          <option value="1" selected>分割なし</option>
+          <option value="2">2行</option>
+          <option value="3">3行</option>
+          <option value="4">4行</option>
+        </select>
+
+        <div class="split-icon-field" id="crop-mode-field" hidden>
+          <p class="group-label">切り抜き方法</p>
+          <div class="split-icon-row" id="crop-mode-group">
+            <button type="button" class="split-icon-btn is-active" data-crop-mode="free" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 8V3h5M30 8V3h-5M2 16v5h5M30 16v5h-5"/></svg>
+              <span>自由</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-crop-mode="ratio" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="2" width="14" height="20" rx="2"/></svg>
+              <span>比率</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="split-icon-field" id="aspect-ratio-field" hidden>
+          <label class="group-label">比率</label>
+          <div class="split-icon-row" id="aspect-ratio-row">
+            <button type="button" class="split-icon-btn" data-ratio="1:1" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="7" y="3" width="18" height="18" rx="2"/></svg>
+              <span>1:1</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-ratio="4:5" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="8" y="2" width="16" height="20" rx="2"/></svg>
+              <span>4:5</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-ratio="3:4" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="8.5" y="2" width="15" height="20" rx="2"/></svg>
+              <span>3:4</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-ratio="9:16" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="9.75" y="1" width="12.5" height="22" rx="2"/></svg>
+              <span>9:16</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-ratio="16:9" disabled>
+              <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="3.5" width="30" height="17" rx="2"/></svg>
+              <span>16:9</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="split-icon-field" id="drag-hint-field">
+          <p class="hint" id="crop-hint" hidden>四隅のハンドルをドラッグすると範囲の大きさを、枠の内側をドラッグすると範囲全体の位置を変えられます。</p>
+          <p class="hint" id="drag-hint">境界の線をつまんで動かすと、切る位置を好きなように変えられます。</p>
+          <button type="button" class="reset-chip" id="reset-guides-btn" disabled style="align-self: flex-end;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 8 8 8"/></svg><span>Layoutを初期状態に戻す</span></button>
+        </div>
+      </div>
+
+      <div class="inline-error" id="load-error"></div>
+      </div>
+
+      <div class="category-panel" id="category-panel-effects" data-category-panel="effects" hidden>
+      <div class="field-group" id="field-group-effects">
+        <div class="seg-tabs" id="effect-tabs" role="group" aria-label="編集するエフェクト">
+          <button type="button" class="seg-tab is-active" data-effect-tab="blur">
+            <svg viewBox="0 0 32 24" aria-hidden="true"><circle cx="12" cy="10" r="7" fill="currentColor" opacity="0.28" stroke="none"/><circle cx="20" cy="10" r="7" fill="currentColor" opacity="0.28" stroke="none"/><circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.28" stroke="none"/></svg>
+            <span>ぼかし・モザイク</span>
+            <span class="effect-dot" id="blur-effect-dot" hidden></span>
+          </button>
+          <button type="button" class="seg-tab" data-effect-tab="speedlines">
+            <svg viewBox="0 0 32 24" aria-hidden="true" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+              <circle cx="16" cy="12" r="2.4" fill="currentColor" stroke="none"/>
+              <line x1="16" y1="12" x2="5" y2="3"/><line x1="16" y1="12" x2="16" y2="1"/><line x1="16" y1="12" x2="27" y2="3"/>
+              <line x1="16" y1="12" x2="1" y2="12"/><line x1="16" y1="12" x2="31" y2="12"/>
+              <line x1="16" y1="12" x2="5" y2="21"/><line x1="16" y1="12" x2="16" y2="23"/><line x1="16" y1="12" x2="27" y2="21"/>
+            </svg>
+            <span>集中線</span>
+            <span class="effect-dot" id="speedlines-effect-dot" hidden></span>
+          </button>
+        </div>
+
+        <div class="effect-panel" id="effect-panel-blur" hidden>
+          <div class="split-icon-field" id="blur-type-section">
+            <p class="group-label">種類</p>
+            <div class="split-icon-row" id="blur-type-group" role="group" aria-label="効果の種類">
+              <button type="button" class="split-icon-btn is-active" data-blur-type="blur" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true"><circle cx="12" cy="10" r="7" fill="currentColor" opacity="0.28" stroke="none"/><circle cx="20" cy="10" r="7" fill="currentColor" opacity="0.28" stroke="none"/><circle cx="16" cy="16" r="7" fill="currentColor" opacity="0.28" stroke="none"/></svg>
+                <span>ぼかし</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-blur-type="mosaic" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true" fill="currentColor" stroke="none"><rect x="2" y="2" width="8" height="8"/><rect x="12" y="2" width="8" height="8"/><rect x="22" y="2" width="8" height="8"/><rect x="2" y="14" width="8" height="8"/><rect x="12" y="14" width="8" height="8"/><rect x="22" y="14" width="8" height="8"/></svg>
+                <span>モザイク</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="split-icon-field">
+            <p class="group-label">範囲</p>
+            <div class="split-icon-row" id="blur-mode-group" role="group" aria-label="効果をかける範囲">
+              <button type="button" class="split-icon-btn is-active" data-blur="none" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span>なし</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-blur="whole" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span>全体</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-blur="topbottom" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true">
+                  <rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <rect x="2" y="2" width="28" height="5.5" fill="currentColor" fill-opacity="0.35"/>
+                  <rect x="2" y="16.5" width="28" height="5.5" fill="currentColor" fill-opacity="0.35"/>
+                </svg>
+                <span>上下</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-blur="edges" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true">
+                  <rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M2,2 H30 V22 H2 Z M21,12 A5,5 0 1,0 11,12 A5,5 0 1,0 21,12 Z" fill="currentColor" fill-opacity="0.35" fill-rule="evenodd"/>
+                </svg>
+                <span>周辺</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-blur="touch" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true">
+                  <rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="16" cy="12" r="5" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.2"/>
+                </svg>
+                <span>タッチ</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-blur="auto" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true">
+                  <rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="16" cy="9" r="3.2" fill="currentColor" fill-opacity="0.6" stroke="none"/>
+                  <path d="M9 20c0-4.5 3-6.5 7-6.5s7 2 7 6.5" fill="currentColor" fill-opacity="0.6" stroke="none"/>
+                </svg>
+                <span>自動</span>
+              </button>
+            </div>
+            <p class="hint" id="blur-mode-desc"></p>
+          </div>
+
+
+          <div class="slider-field" id="blur-strength-row" hidden>
+            <div class="slider-label">
+              <h3 class="slider-heading" id="blur-strength-heading">ぼかしの強さ</h3>
+            </div>
+            <div class="range-wrap">
+              <input autocomplete="off" type="range" id="blur-strength" min="2" max="30" value="12" />
+            </div>
+          </div>
+
+          <div class="slider-field" id="blur-range-row" hidden>
+            <div class="slider-label">
+              <h3 class="slider-heading" id="blur-range-heading">鮮明に残す範囲</h3>
+            </div>
+            <div class="range-wrap">
+              <input autocomplete="off" type="range" id="blur-range" data-unit="%" min="10" max="45" value="24" />
+            </div>
+          </div>
+
+          <div class="split-icon-field" id="blur-auto-brush-row" hidden>
+          <p class="group-label">ブラシの種類</p>
+          <div class="split-icon-row">
+            <button type="button" class="split-icon-btn is-active" data-auto-brush="erase"><svg viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 20h-10.5l-4.21-4.3a1 1 0 0 1 0-1.41l10-10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3"/><path d="M18 13.3l-6.3-6.3"/></svg><span>消す</span></button>
+            <button type="button" class="split-icon-btn" data-auto-brush="add"><svg viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6v12M10 12h12"/></svg><span>足す</span></button>
+          </div>
+        </div>
+        <div class="slider-field" id="blur-brush-row" hidden>
+            <div class="slider-label">
+              <h3 class="slider-heading">ブラシの太さ</h3>
+              <button type="button" class="reset-chip" id="blur-clear-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 20h-10.5l-4.21-4.3a1 1 0 0 1 0-1.41l10-10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3"/><path d="M18 13.3l-6.3-6.3"/></svg><span>クリア</span></button>
+            </div>
+            <div class="range-wrap">
+              <input autocomplete="off" type="range" id="blur-brush" data-unit="px" min="10" max="120" value="40" />
+            </div>
+            <p class="hint" id="blur-brush-hint">プレビュー画像の上を指やマウスでなぞると、なぞった部分に効果がかかります。タッチ中は分割線の操作はできません。</p>
+          </div>
+
+          <div class="split-icon-field" id="blur-auto-row" hidden>
+            <p class="hint" id="blur-auto-status">初回のみ、人物を判定するための準備に少し時間がかかります(要ネット接続)。</p>
+          </div>
+        </div>
+
+        <div class="effect-panel" id="effect-panel-speedlines" hidden>
+          <label class="toggle-card" id="speedlines-toggle-row">
+          <span class="toggle-card-head">
+            <span class="toggle-card-title">集中線を入れる</span>
+            <input autocomplete="off" type="checkbox" id="speedlines-toggle" disabled />
+          </span>
+          <span class="hint" id="speedlines-hint" hidden>プレビュー画像をタップ・ドラッグすると、中心の位置を動かせます。</span>
+        </label>
+
+          <div class="field-row-plain" id="speedlines-color-row" hidden>
+            <h3 class="slider-heading" style="margin-bottom: 10px;">線の色</h3>
+            <div class="color-swatch-row">
+              <button type="button" class="color-swatch is-active" data-color="#ffffff" style="background:#ffffff;" disabled aria-label="白"></button>
+              <button type="button" class="color-swatch" data-color="#000000" style="background:#000000;" disabled aria-label="黒"></button>
+              <button type="button" class="color-swatch" data-color="#ff3b30" style="background:#ff3b30;" disabled aria-label="赤"></button>
+              <button type="button" class="color-swatch" data-color="#ffd60a" style="background:#ffd60a;" disabled aria-label="黄"></button>
+              <button type="button" class="color-swatch" data-color="#d1837e" style="background:#d1837e;" disabled aria-label="アクセントカラー"></button>
+              <label class="color-swatch color-swatch--custom is-disabled" id="speedlines-color-custom-swatch" aria-label="カスタムカラーから選ぶ">
+                <input autocomplete="off" type="color" id="speedlines-color-picker" value="#ffffff" disabled />
+              </label>
+            </div>
+          </div>
+
+          <div class="slider-field" id="speedlines-count-row" hidden>
+            <div class="slider-label"><h3 class="slider-heading">線の数</h3></div>
+            <div class="range-wrap"><input autocomplete="off" type="range" id="speedlines-count" data-unit="本" min="12" max="160" value="60" /></div>
+          </div>
+          <div class="slider-field" id="speedlines-thickness-row" hidden>
+            <div class="slider-label"><h3 class="slider-heading">太さ</h3></div>
+            <div class="range-wrap"><input autocomplete="off" type="range" id="speedlines-thickness" min="2" max="40" value="10" /></div>
+          </div>
+          <div class="slider-field" id="speedlines-length-row" hidden>
+            <div class="slider-label"><h3 class="slider-heading">長さ</h3></div>
+            <div class="range-wrap"><input autocomplete="off" type="range" id="speedlines-length" data-unit="%" min="20" max="95" value="60" /></div>
+          </div>
+          <div class="slider-field" id="speedlines-opacity-row" hidden>
+            <div class="slider-label"><h3 class="slider-heading">透過</h3></div>
+            <div class="range-wrap"><input autocomplete="off" type="range" id="speedlines-opacity" data-unit="%" min="10" max="100" value="70" /></div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="category-panel" id="category-panel-text" data-category-panel="text" hidden>
+      <div class="field-group">
+        <div class="effect-panel" id="effect-panel-text" style="margin-top:0; padding-top:0; border-top:none;">
+          <p class="hint">画像をタップ・ドラッグすると、選んでいるテキストの位置を動かせます。</p>
+
+          <div class="split-icon-field" id="text-layer-field">
+            <p class="group-label">テキスト一覧</p>
+            <div class="split-icon-row" id="text-layer-row" role="group" aria-label="テキストの選択" style="flex-wrap: wrap;">
+              <button type="button" class="text-layer-add-btn" id="text-add-btn" disabled>
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                追加
+              </button>
+            </div>
+          </div>
+
+          <div class="field-row-plain" id="text-content-row" hidden>
+            <h3 class="slider-heading" style="margin-bottom: 10px;">テキスト</h3>
+            <div style="display:flex; gap:8px;">
+              <input autocomplete="off" type="text" id="text-content" class="text-input" placeholder="ここに文字を入力" maxlength="60" disabled />
+              <button type="button" class="reset-chip" id="text-delete-btn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg><span>削除</span></button>
+            </div>
+            <div class="text-preset-row" role="group" aria-label="よく使う文字">
+              <button type="button" class="reset-chip" data-text-preset="© SQUARE ENIX" disabled>© SQUARE ENIX</button>
+              <button type="button" class="reset-chip" data-text-preset="© SEGA" disabled>© SEGA</button>
+              <button type="button" class="reset-chip" data-text-preset="© CAPCOM" disabled>© CAPCOM</button>
+            </div>
+          </div>
+
+          <div class="field-row-plain" id="text-font-row" hidden>
+            <h3 class="slider-heading" style="margin-bottom: 10px;">フォント</h3>
+            <div class="font-swatch-row" id="text-font-group" role="group" aria-label="フォント">
+              <button type="button" class="font-swatch is-active" data-font="'Noto Sans JP', sans-serif" style="font-family:'Noto Sans JP', sans-serif;" disabled>ゴシック</button>
+              <button type="button" class="font-swatch" data-font="'Noto Serif JP', serif" style="font-family:'Noto Serif JP', serif;" disabled>明朝</button>
+              <button type="button" class="font-swatch" data-font="'Shippori Mincho', serif" style="font-family:'Shippori Mincho', serif;" disabled>上品明朝</button>
+              <button type="button" class="font-swatch" data-font="'Kaisei Decol', serif" style="font-family:'Kaisei Decol', serif;" disabled>優雅</button>
+              <button type="button" class="font-swatch" data-font="'Yusei Magic', sans-serif" style="font-family:'Yusei Magic', sans-serif;" disabled>まる文字</button>
+              <button type="button" class="font-swatch" data-font="'Kiwi Maru', serif" style="font-family:'Kiwi Maru', serif;" disabled>やさしい</button>
+              <button type="button" class="font-swatch" data-font="'Yomogi', cursive" style="font-family:'Yomogi', cursive;" disabled>手書き</button>
+              <button type="button" class="font-swatch" data-font="'Hachi Maru Pop', cursive" style="font-family:'Hachi Maru Pop', cursive;" disabled>ポップ丸</button>
+              <button type="button" class="font-swatch" data-font="'Reggae One', sans-serif" style="font-family:'Reggae One', sans-serif;" disabled>ポップ</button>
+              <button type="button" class="font-swatch" data-font="'Potta One', cursive" style="font-family:'Potta One', cursive;" disabled>コミック</button>
+              <button type="button" class="font-swatch" data-font="'Stick', sans-serif" style="font-family:'Stick', sans-serif;" disabled>スティック</button>
+              <button type="button" class="font-swatch" data-font="'RocknRoll One', sans-serif" style="font-family:'RocknRoll One', sans-serif;" disabled>ロック</button>
+              <button type="button" class="font-swatch" data-font="'Dela Gothic One', sans-serif" style="font-family:'Dela Gothic One', sans-serif;" disabled>極太</button>
+              <button type="button" class="font-swatch" data-font="'Gorditas', sans-serif" style="font-family:'Gorditas', sans-serif;" disabled>Gorditas</button>
+            </div>
+          </div>
+
+          <div class="field-row-plain" id="text-color-row" hidden>
+            <h3 class="slider-heading" style="margin-bottom: 10px;">文字色</h3>
+            <div class="color-swatch-row">
+              <button type="button" class="color-swatch is-active" data-color="#ffffff" style="background:#ffffff;" disabled aria-label="白"></button>
+              <button type="button" class="color-swatch" data-color="#000000" style="background:#000000;" disabled aria-label="黒"></button>
+              <button type="button" class="color-swatch" data-color="#ff3b30" style="background:#ff3b30;" disabled aria-label="赤"></button>
+              <button type="button" class="color-swatch" data-color="#ffd60a" style="background:#ffd60a;" disabled aria-label="黄"></button>
+              <button type="button" class="color-swatch" data-color="#d1837e" style="background:#d1837e;" disabled aria-label="アクセントカラー"></button>
+              <label class="color-swatch color-swatch--custom is-disabled" id="text-color-custom-swatch" aria-label="カスタムカラーから選ぶ">
+                <input autocomplete="off" type="color" id="text-color-picker" value="#ffffff" disabled />
+              </label>
+            </div>
+          </div>
+
+          <div class="split-icon-field" id="text-outline-field" hidden>
+            <p class="group-label">縁取り</p>
+            <div class="split-icon-row" id="text-outline-mode-group" style="max-width: 320px;">
+              <button type="button" class="split-icon-btn is-active" data-outline="auto" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><text x="16" y="18" font-size="15" font-weight="700" text-anchor="middle" fill="none" stroke="currentColor">A</text></svg>
+                <span>自動</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-outline="none" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true"><text x="16" y="18" font-size="15" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">A</text></svg>
+                <span>なし</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-outline="custom" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true"><text x="14" y="18" font-size="15" font-weight="700" text-anchor="middle" fill="none" stroke="currentColor" stroke-width="1.5">A</text><circle cx="23" cy="6.5" r="3.6" fill="currentColor" opacity="0.3"/><circle cx="23" cy="6.5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+                <span>色を選ぶ</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field-row-plain" id="text-outline-color-row" hidden>
+            <h3 class="slider-heading" style="margin-bottom: 10px;">縁取りの色</h3>
+            <div class="color-swatch-row">
+              <button type="button" class="color-swatch" data-color="#ffffff" style="background:#ffffff;" disabled aria-label="白"></button>
+              <button type="button" class="color-swatch is-active" data-color="#000000" style="background:#000000;" disabled aria-label="黒"></button>
+              <button type="button" class="color-swatch" data-color="#ff3b30" style="background:#ff3b30;" disabled aria-label="赤"></button>
+              <button type="button" class="color-swatch" data-color="#ffd60a" style="background:#ffd60a;" disabled aria-label="黄"></button>
+              <button type="button" class="color-swatch" data-color="#d1837e" style="background:#d1837e;" disabled aria-label="アクセントカラー"></button>
+              <label class="color-swatch color-swatch--custom is-disabled" id="text-outline-color-custom-swatch" aria-label="カスタムカラーから選ぶ">
+                <input autocomplete="off" type="color" id="text-outline-color-picker" value="#000000" disabled />
+              </label>
+            </div>
+          </div>
+
+          <div class="slider-field" id="text-size-row" hidden>
+            <div class="slider-label"><h3 class="slider-heading">文字の大きさ</h3></div>
+            <div class="range-wrap"><input autocomplete="off" type="range" id="text-size" data-unit="%" min="3" max="18" value="7" /></div>
+          </div>
+            <label class="toggle-card" id="text-shadow-toggle-row">
+              <span class="toggle-card-head">
+                <span class="toggle-card-title">ドロップシャドウ</span>
+                <input autocomplete="off" type="checkbox" id="text-shadow-toggle" disabled />
+              </span>
+              <span class="hint" id="text-shadow-hint" hidden>文字の右下に影を落とします。</span>
+            </label>
+            <div class="field-row-plain" id="text-shadow-color-row" hidden>
+              <h3 class="slider-heading" style="margin-bottom: 10px;">影の色</h3>
+              <div class="color-swatch-row">
+                <button type="button" class="color-swatch is-active" data-color="#000000" style="background:#000000;" disabled aria-label="黒"></button>
+                <button type="button" class="color-swatch" data-color="#ffffff" style="background:#ffffff;" disabled aria-label="白"></button>
+                <button type="button" class="color-swatch" data-color="#ff3b30" style="background:#ff3b30;" disabled aria-label="赤"></button>
+                <button type="button" class="color-swatch" data-color="#ffd60a" style="background:#ffd60a;" disabled aria-label="黄"></button>
+                <button type="button" class="color-swatch" data-color="#d1837e" style="background:#d1837e;" disabled aria-label="アクセントカラー"></button>
+                <label class="color-swatch color-swatch--custom is-disabled" id="text-shadow-color-custom-swatch" aria-label="カスタムカラーから選ぶ">
+                  <input autocomplete="off" type="color" id="text-shadow-color-picker" value="#000000" disabled />
+                </label>
+              </div>
+            </div>
+            <div class="slider-field" id="text-shadow-distance-row" hidden>
+              <div class="slider-label"><h3 class="slider-heading">距離</h3></div>
+              <div class="range-wrap"><input autocomplete="off" type="range" id="text-shadow-distance" data-unit="%" min="0" max="30" value="12" /></div>
+            </div>
+            <div class="slider-field" id="text-shadow-blur-row" hidden>
+              <div class="slider-label"><h3 class="slider-heading">ぼかし</h3></div>
+              <div class="range-wrap"><input autocomplete="off" type="range" id="text-shadow-blur" data-unit="%" min="0" max="30" value="10" /></div>
+            </div>
+            
+        </div>
+      </div>
+      </div>
+
+      <div class="category-panel" id="category-panel-brightness" data-category-panel="brightness" hidden>
+      <div class="field-group">
+        <div class="effect-panel" id="effect-panel-brightness" style="margin-top:0; padding-top:0; border-top:none;">
+          <div class="split-icon-field" id="brightness-range-field">
+            <p class="group-label">範囲</p>
+            <div class="split-icon-row" id="brightness-range-group" role="group" aria-label="明るさを適用する範囲">
+              <button type="button" class="split-icon-btn is-active" data-brightness-range="whole" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span>全体</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-brightness-range="person" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true">
+                  <rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="16" cy="9" r="3.2" fill="currentColor" fill-opacity="0.6" stroke="none"/>
+                  <path d="M9 20c0-4.5 3-6.5 7-6.5s7 2 7 6.5" fill="currentColor" fill-opacity="0.6" stroke="none"/>
+                </svg>
+                <span>人物のみ</span>
+              </button>
+              <button type="button" class="split-icon-btn" data-brightness-range="background" disabled>
+                <svg viewBox="0 0 32 24" aria-hidden="true">
+                  <rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M2,2H30V22H2Z M19.2,9a3.2,3.2 0 1,0 -6.4,0 3.2,3.2 0 1,0 6.4,0 Z M23,20c0,-4.5 -3,-6.5 -7,-6.5s-7,2 -7,6.5Z" fill="currentColor" fill-opacity="0.35" fill-rule="evenodd"/>
+                </svg>
+                <span>背景のみ</span>
+              </button>
+            </div>
+            <p class="hint" id="brightness-range-status" hidden></p>
+          </div>
+
+          
+
+          <div class="split-icon-field">
+          <p class="group-label">プリセット</p>
+          <div class="split-icon-row" id="brightness-preset-group" role="group" aria-label="明るさのプリセット">
+            <button type="button" class="split-icon-btn is-active" data-brightness="none" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><line x1="6.3" y1="6.3" x2="17.7" y2="17.7"/></svg>
+              <span>なし</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-brightness="whitening" disabled>
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3l1.4 4.2L17.6 8.6 13.4 10 12 14.2 10.6 10 6.4 8.6 10.6 7.2 12 3z"/><path d="M18.2 13l0.7 2.1L21 15.8l-2.1 0.7-0.7 2.1-0.7-2.1L15.4 15.8l2.1-0.7 0.7-2.1z"/></svg>
+              <span>美白</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-brightness="natural" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20c9 0 14-5 14-14 -9 0-14 5-14 14z"/><path d="M5.5 19.5c3-6 6-9 10-11"/></svg>
+              <span>ナチュラル</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-brightness="vivid" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg>
+              <span>くっきり</span>
+            </button>
+            <button type="button" class="split-icon-btn" data-brightness="warm" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-1 3-4 4.5-4 8.5a4 4 0 0 0 8 0c0-1.5-0.8-2.2-0.8-3.5 1 1 1.8 2.3 1.8 4.5a5 5 0 0 1-10 0c0-5.5 3.5-6.8 5-9.5z"/></svg>
+              <span>あたたかみ</span>
+            </button>
+          </div>
+          </div>
+          <p class="hint" id="brightness-desc"></p>
+          <div class="slider-field" id="brightness-intensity-row" hidden>
+            <div class="slider-label"><h3 class="slider-heading">効果の強さ</h3></div>
+            <div class="range-wrap"><input autocomplete="off" type="range" id="brightness-intensity" data-unit="%" min="10" max="150" value="100" /></div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="split-btn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg><span>画像を書き出す</span></button>
+      </div>
+    </aside>
+  </div>
+
+  <section id="results" hidden>
+    <h2>書き出した画像</h2>
+    <div id="result-grid"></div>
+  </section>
+
+  <footer>
+    JPG・PNG・WebP・HEIC/HEIF(iPhoneの写真)の読み込みに対応しています。書き出しはPNG形式です。処理はすべて手元のブラウザで行われ、画像がどこかに送られることはありません。
+    <p style="margin: 8px 0 0; text-align: center;">&copy; 2026 Yuzu Pic Studio</p>
+  </footer>
+</div>
+
+<script>
+const dropzone = document.getElementById("dropzone");
+
+const uploadCaption = document.querySelector(".upload-caption");
+
+const fileInput = document.getElementById("file-input");
+
+const workspace = document.getElementById("workspace");
+
+const previewShell = document.getElementById("preview-shell");
+
+const previewStage = document.getElementById("preview-stage");
+
+const previewImg = document.getElementById("preview-img");
+
+const colsSelect = document.getElementById("cols");
+
+const rowsSelect = document.getElementById("rows");
+
+const rowsRow = document.getElementById("rows-row");
+
+const dragHint = document.getElementById("drag-hint");
+
+const resetGuidesBtn = document.getElementById("reset-guides-btn");
+
+const cropModeField = document.getElementById("crop-mode-field");
+
+const cropModeButtons = Array.from(document.getElementById("crop-mode-group").querySelectorAll(".split-icon-btn"));
+
+const cropHint = document.getElementById("crop-hint");
+
+const aspectRatioField = document.getElementById("aspect-ratio-field");
+
+const aspectRatioButtons = Array.from(document.getElementById("aspect-ratio-row").querySelectorAll(".split-icon-btn"));
+
+const snsModeToggle = document.getElementById("sns-mode-toggle");
+
+const snsModeHint = document.getElementById("sns-mode-hint");
+
+const cropRatioRow = document.getElementById("crop-ratio-row");
+
+const cropRatioInput = document.getElementById("crop-ratio");
+
+const cropRatioValue = document.getElementById("crop-ratio-value");
+
+const resetCropBtn = document.getElementById("reset-crop-btn");
+
+const loadError = document.getElementById("load-error");
+
+const imageSizeHint = document.getElementById("image-size-hint");
+
+const splitBtn = document.getElementById("split-btn");
+
+const resetBtn = document.getElementById("reset-btn");
+
+const resultsPanel = document.getElementById("results");
+
+const resultGrid = document.getElementById("result-grid");
+
+const blurModeGroup = document.getElementById("blur-mode-group");
+
+const blurModeButtons = Array.from(blurModeGroup.querySelectorAll(".split-icon-btn"));
+
+const blurModeDesc = document.getElementById("blur-mode-desc");
+
+const blurTypeSection = document.getElementById("blur-type-section");
+
+const blurTypeGroup = document.getElementById("blur-type-group");
+
+const blurTypeButtons = Array.from(blurTypeGroup.querySelectorAll(".split-icon-btn"));
+
+const blurStrengthRow = document.getElementById("blur-strength-row");
+
+const blurStrengthHeading = document.getElementById("blur-strength-heading");
+
+const blurStrengthInput = document.getElementById("blur-strength");
+
+const blurRangeRow = document.getElementById("blur-range-row");
+
+const blurRangeHeading = document.getElementById("blur-range-heading");
+
+const blurRangeInput = document.getElementById("blur-range");
+
+const blurBrushRow = document.getElementById("blur-brush-row");
+
+const blurBrushInput = document.getElementById("blur-brush");
+
+const blurClearBtn = document.getElementById("blur-clear-btn");
+
+const blurPaintCanvas = document.getElementById("blur-paint-canvas");
+
+const blurAutoAddCanvas = document.getElementById("blur-auto-add-canvas");
+
+const blurAutoRow = document.getElementById("blur-auto-row");
+
+const blurAutoStatus = document.getElementById("blur-auto-status");
+
+const blurBrushHint = document.getElementById("blur-brush-hint");
+
+const blurPaintCtx = blurPaintCanvas.getContext("2d");
+
+const blurAutoAddCtx = blurAutoAddCanvas.getContext("2d");
+
+const blurAutoBrushButtons = [ ...document.querySelectorAll("[data-auto-brush]") ];
+
+const blurAutoBrushRow = document.getElementById("blur-auto-brush-row");
+
+let autoBrushMode = "erase";
+
+const blurBrushCursor = document.getElementById("blur-brush-cursor");
+
+const effectTabs = Array.from(document.getElementById("effect-tabs").querySelectorAll(".seg-tab"));
+
+const effectPanelBlur = document.getElementById("effect-panel-blur");
+
+const effectPanelSpeedlines = document.getElementById("effect-panel-speedlines");
+
+const effectPanelText = document.getElementById("effect-panel-text");
+
+const effectPanelBrightness = document.getElementById("effect-panel-brightness");
+
+const blurEffectDot = document.getElementById("blur-effect-dot");
+
+const speedlinesEffectDot = document.getElementById("speedlines-effect-dot");
+
+let effectTabOpen = "blur";
+
+const categoryTabs = Array.from(document.getElementById("category-nav").querySelectorAll(".cat-tab[data-category]"));
+
+const categoryPanels = {
+  crop: document.getElementById("category-panel-crop"),
+  effects: document.getElementById("category-panel-effects"),
+  text: document.getElementById("category-panel-text"),
+  brightness: document.getElementById("category-panel-brightness")
+};
+
+const effectsNavDot = document.getElementById("effects-nav-dot");
+
+const mobileExportBtn = document.getElementById("mobile-export-btn");
+
+const mobileScrollFade = document.getElementById("mobile-scroll-fade");
+
+const panelGrip = document.getElementById("panel-grip");
+
+let panelCollapsed = false;
+
+let activeCategory = "crop";
+
+function updateMobileScrollFade() {
+  const panel = categoryPanels[activeCategory];
+  if (!panel || panel.hidden || panelCollapsed) {
+    mobileScrollFade.hidden = true;
+    return;
+  }
+  const hasMore = panel.scrollHeight - panel.scrollTop - panel.clientHeight > 4;
+  mobileScrollFade.hidden = !hasMore;
+}
+
+function updatePanelGrip() {
+  const panel = categoryPanels[activeCategory];
+  if (!panel) {
+    panelGrip.hidden = true;
+    return;
+  }
+  panel.prepend(panelGrip);
+  panelGrip.hidden = false;
+  Object.values(categoryPanels).forEach(p => p.classList.remove("is-collapsed"));
+  panel.classList.toggle("is-collapsed", panelCollapsed);
+  panelGrip.setAttribute("aria-label", panelCollapsed ? "パネルを展開して設定を表示" : "パネルを折りたたんで画像全体を見る");
+}
+
+panelGrip.addEventListener("click", () => {
+  panelCollapsed = !panelCollapsed;
+  updatePanelGrip();
+  updateMobileScrollFade();
+});
+
+mobileExportBtn.addEventListener("click", () => {
+  if (mobileExportBtn.disabled) return;
+  splitBtn.click();
+});
+
+function setCategoryUI() {
+  categoryTabs.forEach(btn => btn.classList.toggle("is-active", btn.dataset.category === activeCategory));
+  Object.keys(categoryPanels).forEach(key => {
+    categoryPanels[key].hidden = key !== activeCategory;
+  });
+  effectsNavDot.hidden = blurMode === "none" && !speedLinesEnabled;
+  updatePanelGrip();
+  updateMobileScrollFade();
+}
+
+categoryTabs.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    activeCategory = btn.dataset.category;
+    if (activeCategory === "text" && textEnabled) {
+      canvasInteractionMode = "text";
+    } else if (activeCategory === "effects" && effectTabOpen === "speedlines" && speedLinesEnabled) {
+      canvasInteractionMode = "speedlines";
+    } else if (activeCategory === "effects" && effectTabOpen === "blur" && (blurMode === "touch" || blurMode === "auto")) {
+      canvasInteractionMode = "blur";
+    } else if (activeCategory === "crop") {
+      canvasInteractionMode = "split";
+    }
+    setCategoryUI();
+    updateHideHandlesVisibility();
+    if (activeCategory === "text" && texts.length === 0 && !textAddBtn.disabled) {
+      addTextLayer({
+        focus: !window.matchMedia("(pointer: coarse)").matches
+      });
+      canvasInteractionMode = "text";
+      setTextUI();
+      updateHideHandlesVisibility();
+    }
+  });
+});
+
+function setEffectTabUI() {
+  effectTabs.forEach(btn => btn.classList.toggle("is-active", btn.dataset.effectTab === effectTabOpen));
+  effectPanelBlur.hidden = effectTabOpen !== "blur";
+  effectPanelSpeedlines.hidden = effectTabOpen !== "speedlines";
+  blurEffectDot.hidden = blurMode === "none";
+  speedlinesEffectDot.hidden = !speedLinesEnabled;
+  textEffectDot.hidden = !textEnabled;
+  brightnessEffectDot.hidden = brightnessPreset === "none";
+  setCategoryUI();
+}
+
+effectTabs.forEach(btn => {
+  btn.addEventListener("click", () => {
+    effectTabOpen = btn.dataset.effectTab;
+    if (effectTabOpen === "speedlines") {
+      if (!speedLinesEnabled) speedLinesToggle.checked = true;
+      canvasInteractionMode = "speedlines";
+      setSpeedLinesUI();
+      updateBlurPreview();
+    } else if (effectTabOpen === "blur" && (blurMode === "touch" || blurMode === "auto")) {
+      canvasInteractionMode = "blur";
+      updateHideHandlesVisibility();
+    }
+    setEffectTabUI();
+  });
+});
+
+const canvasModeBar = document.getElementById("canvas-mode-bar");
+
+const cmTabButtons = Array.from(document.getElementById("canvas-mode-tabs").querySelectorAll(".cm-tab"));
+
+let canvasInteractionMode = "split";
+
+const speedLinesToggle = document.getElementById("speedlines-toggle");
+
+const speedLinesHint = document.getElementById("speedlines-hint");
+
+const speedLinesColorRow = document.getElementById("speedlines-color-row");
+
+const speedLinesColorSwatches = Array.from(speedLinesColorRow.querySelectorAll(".color-swatch[data-color]"));
+
+const speedLinesColorCustomSwatch = document.getElementById("speedlines-color-custom-swatch");
+
+const speedLinesColorPicker = document.getElementById("speedlines-color-picker");
+
+const speedLinesCountRow = document.getElementById("speedlines-count-row");
+
+const speedLinesCountInput = document.getElementById("speedlines-count");
+
+const speedLinesThicknessRow = document.getElementById("speedlines-thickness-row");
+
+const speedLinesThicknessInput = document.getElementById("speedlines-thickness");
+
+const speedLinesLengthRow = document.getElementById("speedlines-length-row");
+
+const speedLinesLengthInput = document.getElementById("speedlines-length");
+
+const speedLinesOpacityRow = document.getElementById("speedlines-opacity-row");
+
+const speedLinesOpacityInput = document.getElementById("speedlines-opacity");
+
+const speedLinesHitarea = document.getElementById("speedlines-hitarea");
+
+const speedLinesHandle = document.getElementById("speedlines-center-handle");
+
+const textLayerRow = document.getElementById("text-layer-row");
+
+const textAddBtn = document.getElementById("text-add-btn");
+
+const textContentRow = document.getElementById("text-content-row");
+
+const textContentInput = document.getElementById("text-content");
+
+const textDeleteBtn = document.getElementById("text-delete-btn");
+
+const textFontRow = document.getElementById("text-font-row");
+
+const textFontButtons = Array.from(document.getElementById("text-font-group").querySelectorAll(".font-swatch"));
+
+const textColorRow = document.getElementById("text-color-row");
+
+const textColorSwatches = Array.from(document.getElementById("text-color-row").querySelectorAll(".color-swatch[data-color]"));
+
+const textColorCustomSwatch = document.getElementById("text-color-custom-swatch");
+
+const textColorPicker = document.getElementById("text-color-picker");
+
+const textOutlineField = document.getElementById("text-outline-field");
+
+const textOutlineModeButtons = Array.from(document.getElementById("text-outline-mode-group").querySelectorAll(".split-icon-btn"));
+
+const textOutlineColorRow = document.getElementById("text-outline-color-row");
+
+const textOutlineColorSwatches = Array.from(document.getElementById("text-outline-color-row").querySelectorAll(".color-swatch[data-color]"));
+
+const textOutlineColorCustomSwatch = document.getElementById("text-outline-color-custom-swatch");
+
+const textOutlineColorPicker = document.getElementById("text-outline-color-picker");
+
+const textShadowToggleRow = document.getElementById("text-shadow-toggle-row");
+
+const textShadowToggle = document.getElementById("text-shadow-toggle");
+
+const textShadowHint = document.getElementById("text-shadow-hint");
+
+const textShadowColorRow = document.getElementById("text-shadow-color-row");
+
+const textShadowColorSwatches = Array.from(document.getElementById("text-shadow-color-row").querySelectorAll(".color-swatch[data-color]"));
+
+const textShadowColorCustomSwatch = document.getElementById("text-shadow-color-custom-swatch");
+
+const textShadowColorPicker = document.getElementById("text-shadow-color-picker");
+
+const textShadowDistanceRow = document.getElementById("text-shadow-distance-row");
+
+const textShadowDistanceInput = document.getElementById("text-shadow-distance");
+
+const textShadowBlurRow = document.getElementById("text-shadow-blur-row");
+
+const textShadowBlurInput = document.getElementById("text-shadow-blur");
+
+const textSizeRow = document.getElementById("text-size-row");
+
+const textSizeInput = document.getElementById("text-size");
+
+const textHitarea = document.getElementById("text-hitarea");
+
+const textEffectDot = document.getElementById("text-nav-dot");
+
+const MAX_TEXT_LAYERS = 5;
+
+const brightnessPresetGroup = document.getElementById("brightness-preset-group");
+
+const brightnessPresetButtons = Array.from(brightnessPresetGroup.querySelectorAll(".split-icon-btn"));
+
+const brightnessDesc = document.getElementById("brightness-desc");
+
+const brightnessIntensityRow = document.getElementById("brightness-intensity-row");
+
+const brightnessRangeField = document.getElementById("brightness-range-field");
+
+const brightnessRangeButtons = [ ...document.querySelectorAll("[data-brightness-range]") ];
+
+const brightnessRangeStatus = document.getElementById("brightness-range-status");
+
+const brightnessIntensityInput = document.getElementById("brightness-intensity");
+
+const brightnessEffectDot = document.getElementById("brightness-nav-dot");
+
+const DEFAULT_CROP_RATIO = 2.04;
+
+let loadedImage = null;
+
+let colPositions = [];
+
+let rowPositions = [];
+
+let dragging = null;
+
+let blurMode = "none";
+
+let autoSubjectMaskCanvas = null;
+
+let autoSubjectLoading = false;
+
+let autoSubjectError = null;
+
+let imageSegmenterInstance = null;
+
+let blurType = "blur";
+
+let blurStrength = 12;
+
+let blurRange = 24;
+
+let blurBrushSize = 40;
+
+let blurPainting = false;
+
+const BLUR_STRENGTH_RANGES = {
+  blur: {
+    min: 2,
+    max: 30,
+    default: 12
+  },
+  mosaic: {
+    min: 5,
+    max: 60,
+    default: 20
+  }
+};
+
+const BLUR_RANGE_HEADINGS = {
+  topbottom: "鮮明に残す範囲(中央の帯の太さ)",
+  edges: "鮮明に残す範囲(中央の広さ)"
+};
+
+const BLUR_MODE_DESCRIPTIONS = {
+  none: "加工を使わず、そのまま書き出します",
+  whole: "画像全体に効果をかけます",
+  topbottom: "画像の上下だけに効果をかけ、中央は鮮明なまま残します",
+  edges: "画像の周辺だけに効果をかけ、中央は鮮明なまま残します",
+  touch: "画像の上をなぞった部分だけに効果をかけます",
+  auto: "人物と思われる部分を自動で判定し、それ以外(背景)だけに効果をかけます"
+};
+
+let speedLinesEnabled = false;
+
+let speedLinesCenter = {
+  x: .5,
+  y: .5
+};
+
+let speedLinesCount = 60;
+
+let speedLinesThickness = 10;
+
+let speedLinesLength = 60;
+
+let speedLinesOpacityPct = 70;
+
+let speedLinesColor = "#ffffff";
+
+let speedLinesDragging = false;
+
+let texts = [];
+
+let textEnabled = false;
+
+let activeTextIndex = -1;
+
+let textDragging = false;
+
+let draggingTextIndex = -1;
+
+function createTextLayer() {
+  return {
+    id: "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    content: "",
+    font: "'Noto Sans JP', sans-serif",
+    color: "#ffffff",
+    size: 7,
+    position: {
+      x: .5,
+      y: .5
+    },
+    outline: "auto",
+    outlineColor: "#000000",
+    shadow: false,
+    shadowColor: "#000000",
+    shadowDistance: 12,
+    shadowBlur: 10
+  };
+}
+
+function getActiveText() {
+  return activeTextIndex >= 0 && activeTextIndex < texts.length ? texts[activeTextIndex] : null;
+}
+
+let brightnessPreset = "none";
+
+let brightnessIntensity = 100;
+
+let brightnessRange = "whole";
+
+const BRIGHTNESS_PRESETS = {
+  whitening: {
+    brightness: 1.18,
+    contrast: 1,
+    saturate: .88,
+    sepia: 0
+  },
+  natural: {
+    brightness: 1.06,
+    contrast: 1.02,
+    saturate: 1.05,
+    sepia: 0
+  },
+  vivid: {
+    brightness: 1.02,
+    contrast: 1.18,
+    saturate: 1.2,
+    sepia: 0
+  },
+  warm: {
+    brightness: 1.06,
+    contrast: 1,
+    saturate: 1.1,
+    sepia: .1
+  }
+};
+
+const BRIGHTNESS_DESCRIPTIONS = {
+  none: "加工を使わず、そのまま書き出します",
+  whitening: "画像全体を明るく、少し彩度を抑えて透明感のある印象にします",
+  natural: "わずかに明るく鮮やかにする、控えめな補正です",
+  vivid: "コントラストと彩度を上げて、くっきりした印象にします",
+  warm: "暖色寄りに少し色味を足して、あたたかい印象にします"
+};
+
+let mode = "free";
+
+let groupStart = 0;
+
+let groupWidth = 1;
+
+let cropRatio = DEFAULT_CROP_RATIO;
+
+let cropTopFrac = .5;
+
+let freeCropEnabled = false;
+
+let cropModeChoice = "free";
+
+let cropRatioLock = null;
+
+let freeCrop = {
+  x0: 0,
+  y0: 0,
+  x1: 1,
+  y1: 1
+};
+
+const FREE_CROP_MIN_SIZE = .08;
+
+function isFreeCropActive() {
+  return mode === "free" && freeCropEnabled;
+}
+
+const MEDIAPIPE_VERSION = "0.10.14";
+
+let heic2anyLoadingPromise = null;
+
+function ensureHeic2AnyLoaded() {
+  if (window.heic2any) return Promise.resolve(window.heic2any);
+  if (heic2anyLoadingPromise) return heic2anyLoadingPromise;
+  heic2anyLoadingPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+    script.onload = () => resolve(window.heic2any);
+    script.onerror = () => reject(new Error("heic2anyの読み込みに失敗しました"));
+    document.head.appendChild(script);
+  });
+  return heic2anyLoadingPromise;
+}
+
+function isHeicFile(file) {
+  if (file.type === "image/heic" || file.type === "image/heif") return true;
+  return /\.(heic|heif)$/i.test(file.name || "");
+}
+
+async function ensureImageSegmenterLoaded() {
+  if (imageSegmenterInstance) return imageSegmenterInstance;
+  const vision = await (import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/vision_bundle.mjs`));
+  const filesetResolver = await vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`);
+  imageSegmenterInstance = await vision.ImageSegmenter.createFromOptions(filesetResolver, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+    },
+    runningMode: "IMAGE",
+    outputCategoryMask: false,
+    outputConfidenceMasks: true
+  });
+  return imageSegmenterInstance;
+}
+
+async function computeAutoSubjectMask() {
+  if (autoSubjectMaskCanvas || autoSubjectLoading || !loadedImage) return;
+  autoSubjectLoading = true;
+  autoSubjectError = null;
+  setBlurModeUI();
+  setBrightnessUI();
+  try {
+    const segmenter = await ensureImageSegmenterLoaded();
+    const result = segmenter.segment(loadedImage);
+    const confidenceMask = result.confidenceMasks[0];
+    const maskFloats = confidenceMask.getAsFloat32Array();
+    const mw = confidenceMask.width, mh = confidenceMask.height;
+    const rawCanvas = document.createElement("canvas");
+    rawCanvas.width = mw;
+    rawCanvas.height = mh;
+    const rctx = rawCanvas.getContext("2d");
+    const imgData = rctx.createImageData(mw, mh);
+    for (let i = 0; i < maskFloats.length; i++) {
+      const blurAlpha = Math.round((1 - maskFloats[i]) * 255);
+      imgData.data[i * 4 + 0] = 255;
+      imgData.data[i * 4 + 1] = 255;
+      imgData.data[i * 4 + 2] = 255;
+      imgData.data[i * 4 + 3] = blurAlpha;
+    }
+    rctx.putImageData(imgData, 0, 0);
+    confidenceMask.close();
+    if (typeof result.close === "function") result.close();
+    const scaledCanvas = document.createElement("canvas");
+    scaledCanvas.width = loadedImage.width;
+    scaledCanvas.height = loadedImage.height;
+    scaledCanvas.getContext("2d").drawImage(rawCanvas, 0, 0, loadedImage.width, loadedImage.height);
+    autoSubjectMaskCanvas = scaledCanvas;
+  } catch (err) {
+    console.error("自動判定の読み込みに失敗:", err);
+    autoSubjectError = "ネット接続を確認するか、他の範囲をお試しください。";
+  } finally {
+    autoSubjectLoading = false;
+    setBlurModeUI();
+    setBrightnessUI();
+    updateBlurPreview();
+  }
+}
+
+function buildBlurMaskCanvas(w, h) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  if (blurMode === "whole") {
+    ctx.fillStyle = "rgba(255,255,255,1)";
+    ctx.fillRect(0, 0, w, h);
+  } else if (blurMode === "topbottom") {
+    const band = blurRange / 100;
+    const feather = .1;
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(Math.max(0, band - feather), "rgba(255,255,255,1)");
+    grad.addColorStop(band, "rgba(255,255,255,0)");
+    grad.addColorStop(1 - band, "rgba(255,255,255,0)");
+    grad.addColorStop(Math.min(1, 1 - band + feather), "rgba(255,255,255,1)");
+    grad.addColorStop(1, "rgba(255,255,255,1)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (blurMode === "edges") {
+    const cx = w / 2, cy = h / 2;
+    const innerR = Math.min(w, h) * (blurRange / 100);
+    const outerR = innerR + Math.max(w, h) * .36;
+    const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+    grad.addColorStop(0, "rgba(255,255,255,0)");
+    grad.addColorStop(1, "rgba(255,255,255,1)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  } else if (blurMode === "touch") {
+    ctx.drawImage(blurPaintCanvas, 0, 0, w, h);
+  } else if (blurMode === "auto") {
+    if (autoSubjectMaskCanvas) {
+      ctx.drawImage(autoSubjectMaskCanvas, 0, 0, w, h);
+    }
+    ctx.drawImage(blurAutoAddCanvas, 0, 0, w, h);
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.drawImage(blurPaintCanvas, 0, 0, w, h);
+    ctx.globalCompositeOperation = "source-over";
+  }
+  return c;
+}
+
+function buildEffectLayer(w, h, source) {
+  source = source || loadedImage;
+  if (blurType === "mosaic") {
+    const blockSize = Math.max(2, Math.round(blurStrength));
+    const smallW = Math.max(1, Math.round(w / blockSize));
+    const smallH = Math.max(1, Math.round(h / blockSize));
+    const small = document.createElement("canvas");
+    small.width = smallW;
+    small.height = smallH;
+    small.getContext("2d").drawImage(source, 0, 0, smallW, smallH);
+    const big = document.createElement("canvas");
+    big.width = w;
+    big.height = h;
+    const gctx = big.getContext("2d");
+    gctx.imageSmoothingEnabled = false;
+    gctx.drawImage(small, 0, 0, smallW, smallH, 0, 0, w, h);
+    return big;
+  }
+  const pad = Math.ceil(blurStrength * 2) + 2;
+  const padded = document.createElement("canvas");
+  padded.width = w + pad * 2;
+  padded.height = h + pad * 2;
+  const pctx = padded.getContext("2d");
+  pctx.drawImage(source, 0, 0, w, h, pad, pad, w, h);
+  pctx.drawImage(source, 0, 0, w, 1, pad, 0, w, pad);
+  pctx.drawImage(source, 0, h - 1, w, 1, pad, h + pad, w, pad);
+  pctx.drawImage(source, 0, 0, 1, h, 0, pad, pad, h);
+  pctx.drawImage(source, w - 1, 0, 1, h, w + pad, pad, pad, h);
+  pctx.drawImage(source, 0, 0, 1, 1, 0, 0, pad, pad);
+  pctx.drawImage(source, w - 1, 0, 1, 1, w + pad, 0, pad, pad);
+  pctx.drawImage(source, 0, h - 1, 1, 1, 0, h + pad, pad, pad);
+  pctx.drawImage(source, w - 1, h - 1, 1, 1, w + pad, h + pad, pad, pad);
+  const blurredPadded = document.createElement("canvas");
+  blurredPadded.width = padded.width;
+  blurredPadded.height = padded.height;
+  const bpctx = blurredPadded.getContext("2d");
+  bpctx.filter = `blur(${blurStrength}px)`;
+  bpctx.drawImage(padded, 0, 0);
+  bpctx.filter = "none";
+  const effect = document.createElement("canvas");
+  effect.width = w;
+  effect.height = h;
+  effect.getContext("2d").drawImage(blurredPadded, pad, pad, w, h, 0, 0, w, h);
+  return effect;
+}
+
+function seededRand(i) {
+  const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function drawSpeedLines(ctx, w, h) {
+  if (!speedLinesEnabled || speedLinesCount <= 0) return;
+  const cx = speedLinesCenter.x * w;
+  const cy = speedLinesCenter.y * h;
+  const maxR = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy));
+  const outerBase = maxR * 1.05;
+  const lengthFrac = speedLinesLength / 100;
+  ctx.save();
+  ctx.fillStyle = speedLinesColor;
+  ctx.globalAlpha = speedLinesOpacityPct / 100;
+  for (let i = 0; i < speedLinesCount; i++) {
+    const angle = i / speedLinesCount * Math.PI * 2;
+    const lenVariation = .85 + seededRand(i) * .3;
+    const outerR = outerBase * lenVariation;
+    const innerR = outerR * (1 - lengthFrac);
+    const halfWidthAngle = speedLinesThickness / outerR;
+    const tipX = cx + Math.cos(angle) * innerR;
+    const tipY = cy + Math.sin(angle) * innerR;
+    const base1X = cx + Math.cos(angle - halfWidthAngle) * outerR;
+    const base1Y = cy + Math.sin(angle - halfWidthAngle) * outerR;
+    const base2X = cx + Math.cos(angle + halfWidthAngle) * outerR;
+    const base2Y = cy + Math.sin(angle + halfWidthAngle) * outerR;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(base1X, base1Y);
+    ctx.lineTo(base2X, base2Y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function buildBrightnessMaskCanvas(w, h) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  if (!autoSubjectMaskCanvas) return c;
+  const ctx = c.getContext("2d");
+  if (brightnessRange === "background") {
+    ctx.drawImage(autoSubjectMaskCanvas, 0, 0, w, h);
+  } else if (brightnessRange === "person") {
+    ctx.fillStyle = "rgba(255,255,255,1)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.drawImage(autoSubjectMaskCanvas, 0, 0, w, h);
+    ctx.globalCompositeOperation = "source-over";
+  }
+  return c;
+}
+
+function buildBrightnessFilterString() {
+  if (brightnessPreset === "none") return "none";
+  const p = BRIGHTNESS_PRESETS[brightnessPreset];
+  const t = brightnessIntensity / 100;
+  const b = 1 + (p.brightness - 1) * t;
+  const c = 1 + (p.contrast - 1) * t;
+  const s = 1 + (p.saturate - 1) * t;
+  const se = p.sepia * t;
+  return `brightness(${b}) contrast(${c}) saturate(${s}) sepia(${se})`;
+}
+
+function isColorLight(hex) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return (.299 * r + .587 * g + .114 * b) / 255 > .6;
+}
+
+function drawTextOverlay(ctx, w, h) {
+  texts.forEach(t => {
+    if (!t.content.trim()) return;
+    const fontSizePx = Math.max(8, Math.round(h * (t.size / 100)));
+    ctx.save();
+    ctx.font = `bold ${fontSizePx}px ${t.font}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    const x = t.position.x * w, y = t.position.y * h;
+    if (t.shadow) {
+      const dist = fontSizePx * (t.shadowDistance / 100);
+      ctx.shadowColor = t.shadowColor;
+      ctx.shadowOffsetX = dist * Math.SQRT1_2;
+      ctx.shadowOffsetY = dist * Math.SQRT1_2;
+      ctx.shadowBlur = fontSizePx * (t.shadowBlur / 100);
+    }
+    if (t.outline !== "none") {
+      ctx.strokeStyle = t.outline === "custom" ? t.outlineColor : isColorLight(t.color) ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
+      ctx.lineWidth = Math.max(2, fontSizePx * .07);
+      ctx.strokeText(t.content, x, y);
+    }
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.content, x, y);
+    ctx.restore();
+  });
+}
+
+function getRenderSource(opts = {}) {
+  if (!loadedImage) return null;
+  const w = loadedImage.width, h = loadedImage.height;
+  const hasText = texts.some(t => t.content.trim());
+  const needsOverlay = !opts.skipOverlays && (speedLinesEnabled || hasText);
+  if (blurMode === "none" && !needsOverlay && brightnessPreset === "none") return loadedImage;
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const octx = out.getContext("2d");
+  const applyToWhole = brightnessPreset !== "none" && brightnessRange === "whole";
+  octx.filter = applyToWhole ? buildBrightnessFilterString() : "none";
+  octx.drawImage(loadedImage, 0, 0, w, h);
+  octx.filter = "none";
+  if (brightnessPreset !== "none" && brightnessRange !== "whole" && autoSubjectMaskCanvas) {
+    const filtered = document.createElement("canvas");
+    filtered.width = w;
+    filtered.height = h;
+    const fctx = filtered.getContext("2d");
+    fctx.filter = buildBrightnessFilterString();
+    fctx.drawImage(loadedImage, 0, 0, w, h);
+    fctx.filter = "none";
+    fctx.globalCompositeOperation = "destination-in";
+    fctx.drawImage(buildBrightnessMaskCanvas(w, h), 0, 0);
+    fctx.globalCompositeOperation = "source-over";
+    octx.drawImage(filtered, 0, 0);
+  }
+  let brightSource = loadedImage;
+  if (brightnessPreset !== "none") {
+    brightSource = document.createElement("canvas");
+    brightSource.width = w;
+    brightSource.height = h;
+    brightSource.getContext("2d").drawImage(out, 0, 0);
+  }
+  if (blurMode !== "none") {
+    const effectLayer = buildEffectLayer(w, h, brightSource);
+    const ectx = effectLayer.getContext("2d");
+    ectx.globalCompositeOperation = "destination-in";
+    ectx.drawImage(buildBlurMaskCanvas(w, h), 0, 0);
+    ectx.globalCompositeOperation = "source-over";
+    octx.drawImage(effectLayer, 0, 0);
+  }
+  if (!opts.skipOverlays) {
+    drawSpeedLines(octx, w, h);
+    drawTextOverlay(octx, w, h);
+  }
+  return out;
+}
+
+function updateBlurPreview() {
+  if (!loadedImage) return;
+  const source = getRenderSource();
+  if (source === loadedImage) {
+    previewImg.src = previewImg.dataset.originalSrc || previewImg.src;
+    return;
+  }
+  previewImg.src = source.toDataURL("image/png");
+}
+
+const liveOverlay = document.getElementById("live-overlay");
+
+const LIVE_MAX_SIDE = 1600;
+
+let liveActive = false, liveBase = null, liveScale = 1, liveRafPending = false;
+
+function beginLiveOverlay() {
+  if (!loadedImage || liveActive) return;
+  const w = loadedImage.width, h = loadedImage.height;
+  liveScale = Math.min(1, LIVE_MAX_SIDE / Math.max(w, h));
+  const ow = Math.max(1, Math.round(w * liveScale)), oh = Math.max(1, Math.round(h * liveScale));
+  const base = getRenderSource({
+    skipOverlays: true
+  });
+  liveBase = document.createElement("canvas");
+  liveBase.width = ow;
+  liveBase.height = oh;
+  liveBase.getContext("2d").drawImage(base, 0, 0, ow, oh);
+  liveOverlay.width = ow;
+  liveOverlay.height = oh;
+  liveActive = true;
+  drawLiveOverlay();
+  liveOverlay.style.display = "block";
+}
+
+function drawLiveOverlay() {
+  if (!liveActive || !loadedImage) return;
+  const ctx = liveOverlay.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, liveOverlay.width, liveOverlay.height);
+  ctx.drawImage(liveBase, 0, 0);
+  ctx.setTransform(liveScale, 0, 0, liveScale, 0, 0);
+  drawSpeedLines(ctx, loadedImage.width, loadedImage.height);
+  drawTextOverlay(ctx, loadedImage.width, loadedImage.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function scheduleLiveDraw() {
+  if (liveRafPending) return;
+  liveRafPending = true;
+  requestAnimationFrame(() => {
+    liveRafPending = false;
+    drawLiveOverlay();
+  });
+}
+
+function wireLiveColorInput(input, onChange) {
+  let settleTimer = null;
+  input.addEventListener("input", () => {
+    onChange();
+    if (!liveActive) beginLiveOverlay(); else scheduleLiveDraw();
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      if (liveActive) endLiveOverlay();
+    }, 400);
+  });
+  input.addEventListener("change", () => {
+    clearTimeout(settleTimer);
+    if (liveActive) endLiveOverlay();
+  });
+}
+
+function endLiveOverlay() {
+  if (!liveActive) return;
+  liveActive = false;
+  liveBase = null;
+  updateBlurPreview();
+  const hide = () => {
+    if (!liveActive) liveOverlay.style.display = "none";
+  };
+  previewImg.decode().then(hide, hide);
+}
+
+function evenSplits(count) {
+  return Array.from({
+    length: count - 1
+  }, (_, i) => (i + 1) / count);
+}
+
+function canUseLinkedMode() {
+  const cols = Number(colsSelect.value);
+  const rows = Number(rowsSelect.value);
+  return cols >= 2 && cols <= 4 && rows === 1;
+}
+
+function isLinked() {
+  return mode !== "free" && canUseLinkedMode();
+}
+
+const MODE_HINTS = {
+  free: "境界の線をつまんで動かすと、切る位置を好きなように変えられます。",
+  x: "縦線はどれでもつまんで動かせ、全体の幅が変わります。狭めると、はみ出す上下がプレビューで暗く示され、自動でカットされます。中央の丸いハンドルで、位置を上下左右にずらせます。"
+};
+
+function setModeUI() {
+  snsModeToggle.checked = mode !== "free";
+  dragHint.textContent = MODE_HINTS[mode];
+  dragHint.hidden = Number(colsSelect.value) <= 1 && Number(rowsSelect.value) <= 1;
+  cropRatioRow.hidden = mode !== "x";
+  cropModeField.hidden = mode !== "free";
+  cropHint.hidden = mode !== "free" || !freeCropEnabled;
+  aspectRatioField.hidden = mode !== "free" || cropModeChoice !== "ratio";
+  rowsRow.hidden = mode !== "free";
+  if (mode !== "free" && freeCropEnabled) {
+    freeCropEnabled = false;
+    cropRatioLock = null;
+  }
+}
+
+function setBlurModeUI() {
+  blurModeButtons.forEach(btn => btn.classList.toggle("is-active", btn.dataset.blur === blurMode));
+  blurModeDesc.textContent = BLUR_MODE_DESCRIPTIONS[blurMode];
+  blurStrengthRow.hidden = blurMode === "none";
+  blurRangeRow.hidden = blurMode !== "topbottom" && blurMode !== "edges";
+  if (!blurRangeRow.hidden) blurRangeHeading.textContent = BLUR_RANGE_HEADINGS[blurMode];
+  blurBrushRow.hidden = blurMode !== "touch" && blurMode !== "auto";
+  blurAutoBrushRow.hidden = blurMode !== "auto";
+  if (blurMode === "auto") {
+    blurBrushHint.textContent = autoBrushMode === "add" ? "自動判定でぼかしが足りない部分があれば、なぞってぼかしを足せます。" : "人物と判定された部分でも、誤ってぼかされてしまった箇所(耳や装飾品など)があれば、なぞって鮮明さを復元できます。";
+  } else if (blurMode === "touch") {
+    blurBrushHint.textContent = "プレビュー画像の上を指やマウスでなぞると、なぞった部分に効果がかかります。タッチ中は分割線の操作はできません。";
+  }
+  const blurCanvasTab = cmTabButtons.find(b => b.dataset.canvasMode === "blur");
+  if (blurCanvasTab) blurCanvasTab.textContent = blurMode === "auto" ? "補正ブラシ" : "ぼかし範囲";
+  blurAutoRow.hidden = blurMode !== "auto" || !autoSubjectError && !autoSubjectLoading && !!autoSubjectMaskCanvas;
+  if (blurMode === "auto") {
+    if (autoSubjectError) {
+      blurAutoStatus.textContent = autoSubjectError;
+    } else if (autoSubjectLoading) {
+      blurAutoStatus.textContent = "人物を判定する準備をしています…";
+    } else if (autoSubjectMaskCanvas) {
+      blurAutoStatus.textContent = "";
+    } else {
+      blurAutoStatus.textContent = "初回のみ、人物を判定するための準備に少し時間がかかります(要ネット接続)。";
+    }
+  }
+  previewStage.classList.toggle("is-blur-painting", blurMode === "touch" || blurMode === "auto");
+  updateHideHandlesVisibility();
+  renderBlurBoundary();
+}
+
+function setBlurTypeUI() {
+  blurTypeButtons.forEach(btn => btn.classList.toggle("is-active", btn.dataset.blurType === blurType));
+  blurStrengthHeading.textContent = blurType === "mosaic" ? "モザイクの粗さ" : "ぼかしの強さ";
+}
+
+function updateHideHandlesVisibility() {
+  const splitTab = cmTabButtons.find(b => b.dataset.canvasMode === "split");
+  const blurTab = cmTabButtons.find(b => b.dataset.canvasMode === "blur");
+  const slTab = cmTabButtons.find(b => b.dataset.canvasMode === "speedlines");
+  const textTab = cmTabButtons.find(b => b.dataset.canvasMode === "text");
+  const splitAvailable = activeCategory === "crop";
+  const blurAvailable = activeCategory === "effects" && effectTabOpen === "blur" && (blurMode === "touch" || blurMode === "auto");
+  const slAvailable = activeCategory === "effects" && effectTabOpen === "speedlines" && speedLinesEnabled;
+  const textAvailable = activeCategory === "text" && textEnabled;
+  splitTab.hidden = !splitAvailable;
+  blurTab.hidden = !blurAvailable;
+  slTab.hidden = !slAvailable;
+  textTab.hidden = !textAvailable;
+  const visibleCount = (splitAvailable ? 1 : 0) + (blurAvailable ? 1 : 0) + (slAvailable ? 1 : 0) + (textAvailable ? 1 : 0);
+  canvasModeBar.hidden = visibleCount < 2;
+  const isCurrentlyAvailable = {
+    split: splitAvailable,
+    blur: blurAvailable,
+    speedlines: slAvailable,
+    text: textAvailable
+  }[canvasInteractionMode];
+  if (!isCurrentlyAvailable) {
+    canvasInteractionMode = splitAvailable ? "split" : blurAvailable ? "blur" : slAvailable ? "speedlines" : textAvailable ? "text" : "split";
+  }
+  cmTabButtons.forEach(b => b.classList.toggle("is-active", b.dataset.canvasMode === canvasInteractionMode));
+  previewStage.dataset.canvasMode = canvasInteractionMode;
+  previewStage.dataset.category = activeCategory;
+  setEffectTabUI();
+}
+
+function updateSpeedLinesHandlePosition() {
+  speedLinesHandle.style.left = speedLinesCenter.x * 100 + "%";
+  speedLinesHandle.style.top = speedLinesCenter.y * 100 + "%";
+}
+
+function setSpeedLinesUI() {
+  speedLinesEnabled = speedLinesToggle.checked;
+  const on = speedLinesEnabled;
+  speedLinesHint.hidden = !on;
+  speedLinesColorRow.hidden = !on;
+  speedLinesCountRow.hidden = !on;
+  speedLinesThicknessRow.hidden = !on;
+  speedLinesLengthRow.hidden = !on;
+  speedLinesOpacityRow.hidden = !on;
+  previewStage.classList.toggle("is-speedlines-active", on);
+  speedLinesHandle.style.display = on ? "block" : "none";
+  updateSpeedLinesHandlePosition();
+  updateHideHandlesVisibility();
+}
+
+function renderTextHandles() {
+  previewStage.querySelectorAll(".text-position-handle-dyn").forEach(el => el.remove());
+  texts.forEach((t, i) => {
+    if (!t.content.trim()) return;
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "text-position-handle-dyn" + (i === activeTextIndex ? " is-active" : "");
+    handle.dataset.textIndex = String(i);
+    handle.setAttribute("aria-label", "テキストの位置を動かす");
+    handle.textContent = String(i + 1);
+    handle.style.left = t.position.x * 100 + "%";
+    handle.style.top = t.position.y * 100 + "%";
+    previewStage.appendChild(handle);
+  });
+}
+
+function renderTextLayerChips() {
+  Array.from(textLayerRow.querySelectorAll(".text-layer-chip")).forEach(el => el.remove());
+  texts.forEach((t, i) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "text-layer-chip" + (i === activeTextIndex ? " is-active" : "");
+    const label = document.createElement("span");
+    label.textContent = t.content.trim() ? t.content.trim().slice(0, 8) : `テキスト${i + 1}`;
+    chip.appendChild(label);
+    chip.addEventListener("click", () => selectTextLayer(i));
+    textLayerRow.insertBefore(chip, textAddBtn);
+  });
+  textAddBtn.disabled = !loadedImage || texts.length >= MAX_TEXT_LAYERS;
+}
+
+function syncTextControlsFromActive() {
+  const t = getActiveText();
+  const has = !!t;
+  textContentRow.hidden = !has;
+  textFontRow.hidden = !has;
+  textColorRow.hidden = !has;
+  textOutlineField.hidden = !has;
+  textOutlineColorRow.hidden = !has || t.outline !== "custom";
+  textShadowToggleRow.hidden = !has;
+  textShadowColorRow.hidden = !has || !t.shadow;
+  textShadowDistanceRow.hidden = !has || !t.shadow;
+  textShadowBlurRow.hidden = !has || !t.shadow;
+  textSizeRow.hidden = !has;
+  if (!has) return;
+  textContentInput.value = t.content;
+  textFontButtons.forEach(b => b.classList.toggle("is-active", b.dataset.font === t.font));
+  textColorSwatches.forEach(b => b.classList.toggle("is-active", b.dataset.color === t.color));
+  textColorPicker.value = t.color;
+  textOutlineModeButtons.forEach(b => b.classList.toggle("is-active", b.dataset.outline === t.outline));
+  textOutlineColorSwatches.forEach(b => b.classList.toggle("is-active", b.dataset.color === t.outlineColor));
+  textOutlineColorPicker.value = t.outlineColor;
+  textShadowToggle.checked = t.shadow;
+  textShadowHint.hidden = !t.shadow;
+  textShadowColorSwatches.forEach(b => b.classList.toggle("is-active", b.dataset.color === t.shadowColor));
+  textShadowColorPicker.value = t.shadowColor;
+  textShadowDistanceInput.value = t.shadowDistance;
+  textShadowBlurInput.value = t.shadowBlur;
+  textSizeInput.value = t.size;
+  updateTextSizeFill();
+}
+
+function selectTextLayer(i) {
+  activeTextIndex = i;
+  syncTextControlsFromActive();
+  renderTextLayerChips();
+  renderTextHandles();
+}
+
+function addTextLayer({focus: focus = true} = {}) {
+  if (texts.length >= MAX_TEXT_LAYERS) return;
+  texts.push(createTextLayer());
+  activeTextIndex = texts.length - 1;
+  syncTextControlsFromActive();
+  renderTextLayerChips();
+  renderTextHandles();
+  setTextUI();
+  if (focus && !textContentInput.disabled) textContentInput.focus();
+}
+
+function removeTextLayer(i) {
+  texts.splice(i, 1);
+  if (texts.length === 0 && activeCategory === "text") texts.push(createTextLayer());
+  if (activeTextIndex >= texts.length) activeTextIndex = texts.length - 1;
+  syncTextControlsFromActive();
+  renderTextLayerChips();
+  renderTextHandles();
+  setTextUI();
+  updateBlurPreview();
+}
+
+function setTextUI() {
+  textEnabled = texts.some(t => t.content.trim());
+  previewStage.classList.toggle("is-text-active", textEnabled);
+  renderTextHandles();
+  updateHideHandlesVisibility();
+}
+
+function setBrightnessUI() {
+  brightnessPresetButtons.forEach(btn => btn.classList.toggle("is-active", btn.dataset.brightness === brightnessPreset));
+  brightnessDesc.textContent = BRIGHTNESS_DESCRIPTIONS[brightnessPreset];
+  brightnessIntensityRow.hidden = brightnessPreset === "none";
+  brightnessRangeButtons.forEach(btn => btn.classList.toggle("is-active", btn.dataset.brightnessRange === brightnessRange));
+  if (brightnessRange !== "whole") {
+    if (autoSubjectError) {
+      brightnessRangeStatus.textContent = autoSubjectError;
+    } else if (autoSubjectLoading) {
+      brightnessRangeStatus.textContent = "人物を判定する準備をしています…";
+    } else if (!autoSubjectMaskCanvas) {
+      brightnessRangeStatus.textContent = "初回のみ、人物を判定するための準備に少し時間がかかります(要ネット接続)。";
+    }
+  }
+  brightnessRangeStatus.hidden = brightnessRange === "whole" || !autoSubjectError && !autoSubjectLoading && !!autoSubjectMaskCanvas;
+  setEffectTabUI();
+}
+
+let lastNonFreeMode = "x";
+
+function updateModeAvailability() {
+  const available = canUseLinkedMode();
+  snsModeToggle.disabled = workspace.classList.contains("is-disabled");
+  if (!available && mode !== "free") {
+    mode = "free";
+    freeCropEnabled = true;
+    freeCrop = {
+      ...DEFAULT_FREE_CROP
+    };
+    cropModeChoice = "free";
+    cropRatioLock = null;
+  }
+  setModeUI();
+}
+
+function getCropInfo() {
+  if (!loadedImage) return null;
+  if (mode !== "x" || !canUseLinkedMode()) return null;
+  if (loadedImage.width <= loadedImage.height) return null;
+  const sliceWidthFrac = groupWidth / Number(colsSelect.value);
+  const sliceWidthPx = sliceWidthFrac * loadedImage.width;
+  const targetHeightPx = Math.round(sliceWidthPx * cropRatio);
+  if (targetHeightPx >= loadedImage.height) return null;
+  const maxOffset = loadedImage.height - targetHeightPx;
+  const top = Math.round(cropTopFrac * maxOffset);
+  return {
+    targetHeightPx: targetHeightPx,
+    top: top,
+    maxOffset: maxOffset
+  };
+}
+
+function clearOverlays() {
+  previewStage.querySelectorAll(".guide, .group-handle, .nub-btn, .mask-dim, .crop-window, .crop-handle, .free-crop-window").forEach(el => el.remove());
+}
+
+function renderBlurBoundary() {
+  previewStage.querySelectorAll(".blur-boundary-h, .blur-boundary-circle").forEach(el => el.remove());
+  if (!loadedImage) return;
+  if (blurMode === "topbottom") {
+    const top = document.createElement("div");
+    top.className = "blur-boundary-h";
+    top.style.top = blurRange + "%";
+    previewStage.appendChild(top);
+    const bottom = document.createElement("div");
+    bottom.className = "blur-boundary-h";
+    bottom.style.top = 100 - blurRange + "%";
+    previewStage.appendChild(bottom);
+  } else if (blurMode === "edges") {
+    const rect = previewStage.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const r = Math.min(rect.width, rect.height) * (blurRange / 100);
+    const circle = document.createElement("div");
+    circle.className = "blur-boundary-circle";
+    circle.style.width = r * 2 + "px";
+    circle.style.height = r * 2 + "px";
+    circle.style.left = "50%";
+    circle.style.top = "50%";
+    circle.style.transform = "translate(-50%, -50%)";
+    previewStage.appendChild(circle);
+  }
+}
+
+function cropX(localFrac) {
+  return isFreeCropActive() ? freeCrop.x0 + localFrac * (freeCrop.x1 - freeCrop.x0) : localFrac;
+}
+
+function cropY(localFrac) {
+  return isFreeCropActive() ? freeCrop.y0 + localFrac * (freeCrop.y1 - freeCrop.y0) : localFrac;
+}
+
+function makeNub(role, isVert) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "nub-btn" + (isVert ? " is-vert" : "");
+  btn.dataset.role = role;
+  btn.innerHTML = isVert ? '<span class="chev up"></span><span class="chev down"></span>' : '<span class="chev left"></span><span class="chev right"></span>';
+  return btn;
+}
+
+function makeComboNub(role, isTeal) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "nub-btn is-combo" + (isTeal ? " is-teal" : "");
+  btn.dataset.role = role;
+  btn.setAttribute("aria-label", "上下左右に位置をずらす");
+  btn.innerHTML = '<span class="chev up"></span><span class="chev down"></span><span class="chev left"></span><span class="chev right"></span>';
+  return btn;
+}
+
+function renderGuides() {
+  clearOverlays();
+  if (!loadedImage) return;
+  if (isFreeCropActive()) renderFreeCropHandles();
+  if (isLinked()) {
+    const cols = Number(colsSelect.value);
+    const sliceWidthFrac = groupWidth / cols;
+    for (let i = 1; i < cols; i++) {
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "group-handle";
+      handle.dataset.role = "linked-divider";
+      handle.dataset.index = i - 1;
+      handle.setAttribute("aria-label", i + "本目の区切り(幅を変更)");
+      handle.style.left = (groupStart + sliceWidthFrac * i) * 100 + "%";
+      previewStage.appendChild(handle);
+    }
+    const moveHandle = makeComboNub("linked-move");
+    moveHandle.style.left = (groupStart + groupWidth / 2) * 100 + "%";
+    moveHandle.style.top = cols % 2 === 0 ? "68%" : "50%";
+    previewStage.appendChild(moveHandle);
+  } else {
+    colPositions.forEach((pos, index) => {
+      const guide = document.createElement("button");
+      guide.type = "button";
+      guide.className = "guide";
+      guide.dataset.axis = "col";
+      guide.dataset.index = index;
+      guide.setAttribute("aria-label", index + 1 + "本目の縦の切れ目");
+      guide.style.left = cropX(pos) * 100 + "%";
+      previewStage.appendChild(guide);
+    });
+  }
+  rowPositions.forEach((pos, index) => {
+    const guide = document.createElement("button");
+    guide.type = "button";
+    guide.className = "guide is-row";
+    guide.dataset.axis = "row";
+    guide.dataset.index = index;
+    guide.setAttribute("aria-label", index + 1 + "本目の横の切れ目");
+    guide.style.top = cropY(pos) * 100 + "%";
+    previewStage.appendChild(guide);
+  });
+  renderMasks();
+  renderBlurBoundary();
+}
+
+const CROP_HANDLE_ROLES = [ {
+  role: "tl",
+  cursor: "nwse-resize"
+}, {
+  role: "top",
+  cursor: "ns-resize"
+}, {
+  role: "tr",
+  cursor: "nesw-resize"
+}, {
+  role: "left",
+  cursor: "ew-resize"
+}, {
+  role: "right",
+  cursor: "ew-resize"
+}, {
+  role: "bl",
+  cursor: "nesw-resize"
+}, {
+  role: "bottom",
+  cursor: "ns-resize"
+}, {
+  role: "br",
+  cursor: "nwse-resize"
+} ];
+
+function freeCropHandlePosition(role, stageRectArg) {
+  const midX = (freeCrop.x0 + freeCrop.x1) / 2;
+  const midY = (freeCrop.y0 + freeCrop.y1) / 2;
+  const xMap = {
+    tl: freeCrop.x0,
+    left: freeCrop.x0,
+    bl: freeCrop.x0,
+    top: midX,
+    bottom: midX,
+    tr: freeCrop.x1,
+    right: freeCrop.x1,
+    br: freeCrop.x1
+  };
+  const yMap = {
+    tl: freeCrop.y0,
+    top: freeCrop.y0,
+    tr: freeCrop.y0,
+    left: midY,
+    right: midY,
+    bl: freeCrop.y1,
+    bottom: freeCrop.y1,
+    br: freeCrop.y1
+  };
+  const stageRect = stageRectArg || previewStage.getBoundingClientRect();
+  const marginX = stageRect.width > 0 ? 12 / stageRect.width : .01;
+  const marginY = stageRect.height > 0 ? 12 / stageRect.height : .01;
+  const x = Math.min(1 - marginX, Math.max(marginX, xMap[role]));
+  const y = Math.min(1 - marginY, Math.max(marginY, yMap[role]));
+  return {
+    x: x,
+    y: y,
+    ox: (xMap[role] - x) * stageRect.width,
+    oy: (yMap[role] - y) * stageRect.height
+  };
+}
+
+function placeCropHandle(handle, pos) {
+  handle.style.left = pos.x * 100 + "%";
+  handle.style.top = pos.y * 100 + "%";
+  handle.style.setProperty("--ox", pos.ox.toFixed(1) + "px");
+  handle.style.setProperty("--oy", pos.oy.toFixed(1) + "px");
+}
+
+function renderFreeCropHandles() {
+  const win = document.createElement("div");
+  win.className = "free-crop-window";
+  win.style.left = freeCrop.x0 * 100 + "%";
+  win.style.top = freeCrop.y0 * 100 + "%";
+  win.style.width = (freeCrop.x1 - freeCrop.x0) * 100 + "%";
+  win.style.height = (freeCrop.y1 - freeCrop.y0) * 100 + "%";
+  previewStage.appendChild(win);
+  CROP_HANDLE_ROLES.forEach(({role: role, cursor: cursor}) => {
+    const isCorner = role === "tl" || role === "tr" || role === "bl" || role === "br";
+    if (cropRatioLock && !isCorner) return;
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "crop-handle";
+    handle.dataset.role = "fcrop-" + role;
+    handle.style.cursor = cursor;
+    handle.setAttribute("aria-label", "切り抜き範囲を調整");
+    placeCropHandle(handle, freeCropHandlePosition(role));
+    previewStage.appendChild(handle);
+  });
+  const moveHandle = makeComboNub("free-crop-move", true);
+  moveHandle.style.left = (freeCrop.x0 + freeCrop.x1) / 2 * 100 + "%";
+  moveHandle.style.top = (freeCrop.y0 + freeCrop.y1) / 2 * 100 + "%";
+  previewStage.appendChild(moveHandle);
+}
+
+function updateFreeCropVisualsLive() {
+  const win = previewStage.querySelector(".free-crop-window");
+  if (win) {
+    win.style.left = freeCrop.x0 * 100 + "%";
+    win.style.top = freeCrop.y0 * 100 + "%";
+    win.style.width = (freeCrop.x1 - freeCrop.x0) * 100 + "%";
+    win.style.height = (freeCrop.y1 - freeCrop.y0) * 100 + "%";
+  }
+  const liveStageRect = previewStage.getBoundingClientRect();
+  CROP_HANDLE_ROLES.forEach(({role: role}) => {
+    const handle = previewStage.querySelector('.crop-handle[data-role="fcrop-' + role + '"]');
+    if (!handle) return;
+    placeCropHandle(handle, freeCropHandlePosition(role, liveStageRect));
+  });
+  const moveHandle = previewStage.querySelector('.nub-btn[data-role="free-crop-move"]');
+  if (moveHandle) {
+    moveHandle.style.left = (freeCrop.x0 + freeCrop.x1) / 2 * 100 + "%";
+    moveHandle.style.top = (freeCrop.y0 + freeCrop.y1) / 2 * 100 + "%";
+  }
+  colPositions.forEach((pos, index) => {
+    const guide = previewStage.querySelector('.guide[data-axis="col"][data-index="' + index + '"]');
+    if (guide) guide.style.left = cropX(pos) * 100 + "%";
+  });
+  rowPositions.forEach((pos, index) => {
+    const guide = previewStage.querySelector('.guide[data-axis="row"][data-index="' + index + '"]');
+    if (guide) guide.style.top = cropY(pos) * 100 + "%";
+  });
+  renderMasks();
+}
+
+function ensureOverlayEl(selector, tag, className) {
+  let el = previewStage.querySelector(selector);
+  if (!el) {
+    el = document.createElement(tag);
+    el.className = className;
+    previewStage.appendChild(el);
+  }
+  return el;
+}
+
+function renderMasks() {
+  const info = getCropInfo();
+  const comboHandle = previewStage.querySelector('.nub-btn[data-role="linked-move"]');
+  if (!info) {
+    previewStage.querySelectorAll(".mask-dim.is-top, .mask-dim.is-bottom, .crop-window").forEach(el => el.remove());
+    if (comboHandle) comboHandle.style.top = Number(colsSelect.value) % 2 === 0 ? "68%" : "50%";
+  } else {
+    const topPct = info.top / loadedImage.height * 100;
+    const heightPct = info.targetHeightPx / loadedImage.height * 100;
+    const dimTop = ensureOverlayEl(".mask-dim.is-top", "div", "mask-dim is-top");
+    dimTop.style.top = "0";
+    dimTop.style.height = topPct + "%";
+    const dimBottom = ensureOverlayEl(".mask-dim.is-bottom", "div", "mask-dim is-bottom");
+    dimBottom.style.top = topPct + heightPct + "%";
+    dimBottom.style.bottom = "0";
+    const win = ensureOverlayEl(".crop-window", "div", "crop-window");
+    win.style.top = topPct + "%";
+    win.style.height = heightPct + "%";
+    if (comboHandle) {
+      const evenColsOffset = Number(colsSelect.value) % 2 === 0 ? 18 : 0;
+      comboHandle.style.top = topPct + heightPct / 2 + evenColsOffset + "%";
+    }
+  }
+  if (isLinked() && groupWidth < .999) {
+    const leftPct = groupStart * 100;
+    const rightPct = (1 - (groupStart + groupWidth)) * 100;
+    const dimLeft = ensureOverlayEl(".mask-dim.is-left", "div", "mask-dim is-left");
+    dimLeft.style.left = "0";
+    dimLeft.style.width = leftPct + "%";
+    const dimRight = ensureOverlayEl(".mask-dim.is-right", "div", "mask-dim is-right");
+    dimRight.style.right = "0";
+    dimRight.style.width = rightPct + "%";
+  } else if (isFreeCropActive()) {
+    const dimTop2 = ensureOverlayEl(".mask-dim.is-top", "div", "mask-dim is-top");
+    dimTop2.style.top = "0";
+    dimTop2.style.height = freeCrop.y0 * 100 + "%";
+    const dimBottom2 = ensureOverlayEl(".mask-dim.is-bottom", "div", "mask-dim is-bottom");
+    dimBottom2.style.top = freeCrop.y1 * 100 + "%";
+    dimBottom2.style.bottom = "0";
+    const dimLeft2 = ensureOverlayEl(".mask-dim.is-left", "div", "mask-dim is-left");
+    dimLeft2.style.left = "0";
+    dimLeft2.style.width = freeCrop.x0 * 100 + "%";
+    const dimRight2 = ensureOverlayEl(".mask-dim.is-right", "div", "mask-dim is-right");
+    dimRight2.style.right = "0";
+    dimRight2.style.width = (1 - freeCrop.x1) * 100 + "%";
+  } else {
+    previewStage.querySelectorAll(".mask-dim.is-left, .mask-dim.is-right").forEach(el => el.remove());
+  }
+  const hasHorizontalSlack = groupWidth < .999;
+  const hasVerticalSlack = !!(info && info.maxOffset > 0);
+  const comboHandle2 = previewStage.querySelector('.nub-btn[data-role="linked-move"]');
+  if (comboHandle2) comboHandle2.classList.toggle("is-disabled", !hasHorizontalSlack && !hasVerticalSlack);
+}
+
+function updateGroupVisualsLive() {
+  const cols = Number(colsSelect.value);
+  const sliceWidthFrac = groupWidth / cols;
+  previewStage.querySelectorAll('.group-handle[data-role="linked-divider"]').forEach((el, i) => {
+    el.style.left = (groupStart + sliceWidthFrac * (i + 1)) * 100 + "%";
+  });
+  const move = previewStage.querySelector('.nub-btn[data-role="linked-move"]');
+  if (move) move.style.left = (groupStart + groupWidth / 2) * 100 + "%";
+  renderMasks();
+}
+
+function applyLinkedDividerDrag(index0, rawFraction, anchor) {
+  if (!anchor) return;
+  const cols = Number(colsSelect.value);
+  const dividerNumber = index0 + 1;
+  const slicesToAnchor = anchor.side === "right" ? cols - dividerNumber : dividerNumber;
+  const rawSliceWidth = anchor.side === "right" ? (anchor.value - rawFraction) / slicesToAnchor : (rawFraction - anchor.value) / slicesToAnchor;
+  const maxSliceWidth = 1 / cols;
+  const boundedMax = anchor.side === "right" ? anchor.value / cols : (1 - anchor.value) / cols;
+  const minSliceWidth = MIN_GROUP_WIDTH / cols;
+  const sliceWidth = Math.min(maxSliceWidth, boundedMax, Math.max(minSliceWidth, rawSliceWidth));
+  const newStart = anchor.side === "right" ? anchor.value - sliceWidth * cols : anchor.value;
+  groupStart = newStart;
+  groupWidth = sliceWidth * cols;
+}
+
+function setControlsEnabled(enabled) {
+  [ colsSelect, rowsSelect, cropRatioInput, splitBtn, resetBtn, resetGuidesBtn, resetCropBtn, ...cropModeButtons, blurStrengthInput, blurRangeInput, blurBrushInput, blurClearBtn, ...blurModeButtons, ...blurTypeButtons, ...blurAutoBrushButtons, speedLinesToggle, speedLinesCountInput, speedLinesThicknessInput, speedLinesLengthInput, speedLinesOpacityInput, ...speedLinesColorSwatches, speedLinesColorPicker, ...categoryTabs, mobileExportBtn, ...colsIconButtons, ...rowsIconButtons, ...aspectRatioButtons, textAddBtn, textContentInput, textDeleteBtn, ...textFontButtons, ...textColorSwatches, textColorPicker, ...textOutlineModeButtons, ...textOutlineColorSwatches, textOutlineColorPicker, textSizeInput, ...brightnessPresetButtons, brightnessIntensityInput, ...brightnessRangeButtons, ...document.querySelectorAll("[data-text-preset]"), textShadowToggle, ...textShadowColorSwatches, textShadowColorPicker, textShadowDistanceInput, textShadowBlurInput ].forEach(el => {
+    el.disabled = !enabled;
+  });
+  speedLinesColorCustomSwatch.classList.toggle("is-disabled", !enabled);
+  textColorCustomSwatch.classList.toggle("is-disabled", !enabled);
+  textOutlineColorCustomSwatch.classList.toggle("is-disabled", !enabled);
+  workspace.classList.toggle("is-disabled", !enabled);
+  updateModeAvailability();
+}
+
+const KNOWN_RATIOS = [ [ 1, 1 ], [ 4, 5 ], [ 5, 4 ], [ 3, 4 ], [ 4, 3 ], [ 2, 3 ], [ 3, 2 ], [ 9, 16 ], [ 16, 9 ], [ 9, 21 ], [ 21, 9 ], [ 1, 2 ], [ 2, 1 ] ];
+
+function describeAspectRatio(w, h) {
+  const ratio = w / h;
+  let best = null, bestDiff = Infinity;
+  for (const [rw, rh] of KNOWN_RATIOS) {
+    const diff = Math.abs(ratio - rw / rh);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = `${rw}:${rh}`;
+    }
+  }
+  if (bestDiff < .01) return best;
+  return ratio >= 1 ? `${ratio.toFixed(2)}:1` : `1:${(1 / ratio).toFixed(2)}`;
+}
+
+function updateImageSizeHint(img) {
+  if (!img) {
+    imageSizeHint.hidden = true;
+    return;
+  }
+  imageSizeHint.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg>読み込んだ画像: <b>${img.width} × ${img.height}px</b>(${describeAspectRatio(img.width, img.height)})`;
+  imageSizeHint.hidden = false;
+}
+
+function showLoadedImage(img, src) {
+  loadedImage = img;
+  updateImageSizeHint(img);
+  previewImg.src = src;
+  previewImg.dataset.originalSrc = src;
+  autoSubjectMaskCanvas = null;
+  autoSubjectLoading = false;
+  autoSubjectError = null;
+  dropzone.style.display = "none";
+  previewShell.hidden = false;
+  resultsPanel.hidden = true;
+  loadError.classList.remove("is-visible");
+  colPositions = evenSplits(Number(colsSelect.value));
+  rowPositions = evenSplits(Number(rowsSelect.value));
+  groupStart = 0;
+  groupWidth = 1;
+  cropTopFrac = .5;
+  freeCropEnabled = mode === "free";
+  freeCrop = freeCropEnabled ? {
+    ...DEFAULT_FREE_CROP
+  } : {
+    x0: 0,
+    y0: 0,
+    x1: 1,
+    y1: 1
+  };
+  cropModeChoice = "free";
+  cropRatioLock = null;
+  setCropModeUI();
+  blurMode = "none";
+  blurType = "blur";
+  blurStrengthInput.min = BLUR_STRENGTH_RANGES.blur.min;
+  blurStrengthInput.max = BLUR_STRENGTH_RANGES.blur.max;
+  blurStrengthInput.value = BLUR_STRENGTH_RANGES.blur.default;
+  blurStrength = BLUR_STRENGTH_RANGES.blur.default;
+  blurPaintCanvas.width = img.width;
+  blurAutoAddCanvas.width = img.width;
+  blurPaintCanvas.height = img.height;
+  blurAutoAddCanvas.height = img.height;
+  blurPaintCtx.clearRect(0, 0, blurPaintCanvas.width, blurPaintCanvas.height);
+  speedLinesToggle.checked = false;
+  speedLinesCenter = {
+    x: .5,
+    y: .5
+  };
+  speedLinesColor = "#ffffff";
+  speedLinesColorPicker.value = "#ffffff";
+  setSpeedLinesActiveSwatch(speedLinesColorSwatches[0]);
+  setSpeedLinesUI();
+  texts = [];
+  activeTextIndex = -1;
+  renderTextLayerChips();
+  syncTextControlsFromActive();
+  setTextUI();
+  brightnessPreset = "none";
+  brightnessIntensity = 100;
+  brightnessIntensityInput.value = 100;
+  updateBrightnessIntensityFill();
+  setBrightnessUI();
+  setBlurModeUI();
+  setBlurTypeUI();
+  updateBlurStrengthFill();
+  setControlsEnabled(true);
+  renderGuides();
+}
+
+function loadImageFromSrc(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image;
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function loadFile(file) {
+  if (isHeicFile(file)) {
+    const originalCaption = uploadCaption.textContent;
+    uploadCaption.textContent = "HEIC画像を変換しています…";
+    try {
+      const heic2any = await ensureHeic2AnyLoaded();
+      const converted = await heic2any({
+        blob: file,
+        toType: "image/png"
+      });
+      file = Array.isArray(converted) ? converted[0] : converted;
+    } catch (e) {
+      console.error("HEIC変換に失敗:", e);
+      uploadCaption.textContent = originalCaption;
+      loadError.textContent = "HEIC画像の変換に失敗しました。ネット接続を確認するか、他の形式でお試しください。";
+      loadError.classList.add("is-visible");
+      return;
+    }
+    uploadCaption.textContent = originalCaption;
+  }
+  try {
+    const url = URL.createObjectURL(file);
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 1200));
+    const img = await Promise.race([ loadImageFromSrc(url), timeout ]);
+    showLoadedImage(img, url);
+    return;
+  } catch (e) {}
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader;
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const img = await loadImageFromSrc(dataUrl);
+    showLoadedImage(img, dataUrl);
+  } catch (e) {
+    loadError.textContent = "この画像は開けませんでした。JPGかPNGで試してみてください。";
+    loadError.classList.add("is-visible");
+  }
+}
+
+dropzone.addEventListener("dragover", e => {
+  e.preventDefault();
+  dropzone.classList.add("is-drag");
+});
+
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("is-drag"));
+
+dropzone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropzone.classList.remove("is-drag");
+  const file = e.dataTransfer.files[0];
+  if (file && (file.type.startsWith("image/") || isHeicFile(file))) loadFile(file);
+});
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) loadFile(fileInput.files[0]);
+});
+
+colsSelect.addEventListener("change", () => {
+  colPositions = evenSplits(Number(colsSelect.value));
+  groupStart = 0;
+  groupWidth = 1;
+  updateModeAvailability();
+  exitRatioModeIfSplit();
+  renderGuides();
+  updateColsIconUI();
+});
+
+const colsIconButtons = Array.from(document.getElementById("cols-icon-row").querySelectorAll(".split-icon-btn"));
+
+function updateColsIconUI() {
+  colsIconButtons.forEach(btn => btn.classList.toggle("is-active", btn.dataset.cols === colsSelect.value));
+}
+
+colsIconButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    colsSelect.value = btn.dataset.cols;
+    colsSelect.dispatchEvent(new Event("change", {
+      bubbles: true
+    }));
+  });
+});
+
+rowsSelect.addEventListener("change", () => {
+  rowPositions = evenSplits(Number(rowsSelect.value));
+  updateModeAvailability();
+  exitRatioModeIfSplit();
+  renderGuides();
+  updateRowsIconUI();
+});
+
+const rowsIconButtons = Array.from(document.getElementById("rows-icon-row").querySelectorAll(".split-icon-btn"));
+
+function updateRowsIconUI() {
+  rowsIconButtons.forEach(btn => btn.classList.toggle("is-active", btn.dataset.rows === rowsSelect.value));
+}
+
+rowsIconButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    rowsSelect.value = btn.dataset.rows;
+    rowsSelect.dispatchEvent(new Event("change", {
+      bubbles: true
+    }));
+  });
+});
+
+const DEFAULT_FREE_CROP = {
+  x0: 0,
+  y0: 0,
+  x1: 1,
+  y1: 1
+};
+
+function computeCenteredCropForRatio(rw, rh) {
+  const imgW = loadedImage.width, imgH = loadedImage.height;
+  const targetRatio = rw / rh;
+  const imgRatio = imgW / imgH;
+  let cropWpx, cropHpx;
+  if (targetRatio > imgRatio) {
+    cropWpx = imgW;
+    cropHpx = imgW / targetRatio;
+  } else {
+    cropHpx = imgH;
+    cropWpx = imgH * targetRatio;
+  }
+  const x0 = (imgW - cropWpx) / 2 / imgW;
+  const y0 = (imgH - cropHpx) / 2 / imgH;
+  return {
+    x0: x0,
+    y0: y0,
+    x1: 1 - x0,
+    y1: 1 - y0
+  };
+}
+
+aspectRatioButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled || !loadedImage) return;
+    const [rw, rh] = btn.dataset.ratio.split(":").map(Number);
+    cropRatioLock = {
+      w: rw,
+      h: rh
+    };
+    freeCrop = computeCenteredCropForRatio(rw, rh);
+    freeCropEnabled = true;
+    cropModeChoice = "ratio";
+    cropHint.hidden = false;
+    aspectRatioButtons.forEach(b => b.classList.toggle("is-active", b === btn));
+    setCropModeUI();
+    const colsChanged = colsSelect.value !== "1";
+    const rowsChanged = rowsSelect.value !== "1";
+    colsSelect.value = "1";
+    rowsSelect.value = "1";
+    if (colsChanged) colsSelect.dispatchEvent(new Event("change", {
+      bubbles: true
+    }));
+    if (rowsChanged) rowsSelect.dispatchEvent(new Event("change", {
+      bubbles: true
+    }));
+    renderGuides();
+  });
+});
+
+snsModeToggle.addEventListener("change", () => {
+  if (snsModeToggle.disabled) return;
+  const turningOn = snsModeToggle.checked;
+  const enteringFree = !turningOn && mode !== "free";
+  mode = turningOn ? "x" : "free";
+  if (mode !== "free") lastNonFreeMode = mode;
+  if (turningOn) {
+    const snappedCols = Math.min(4, Math.max(2, Number(colsSelect.value)));
+    if (Number(colsSelect.value) !== snappedCols) {
+      colsSelect.value = String(snappedCols);
+      colsSelect.dispatchEvent(new Event("change", {
+        bubbles: true
+      }));
+    }
+    if (Number(rowsSelect.value) !== 1) {
+      rowsSelect.value = "1";
+      rowsSelect.dispatchEvent(new Event("change", {
+        bubbles: true
+      }));
+    }
+  }
+  if (isLinked()) {
+    groupStart = 0;
+    groupWidth = 1;
+  }
+  if (enteringFree) {
+    freeCropEnabled = true;
+    freeCrop = {
+      ...DEFAULT_FREE_CROP
+    };
+    cropModeChoice = "free";
+    cropRatioLock = null;
+    setCropModeUI();
+  }
+  setModeUI();
+  renderGuides();
+});
+
+function setCropModeUI() {
+  cropModeButtons.forEach(b => b.classList.toggle("is-active", b.dataset.cropMode === cropModeChoice));
+  aspectRatioField.hidden = mode !== "free" || cropModeChoice !== "ratio";
+}
+
+function exitRatioModeIfSplit() {
+  if (cropModeChoice === "ratio" && (Number(colsSelect.value) > 1 || Number(rowsSelect.value) > 1)) {
+    cropModeChoice = "free";
+    cropRatioLock = null;
+    freeCrop = {
+      ...DEFAULT_FREE_CROP
+    };
+    aspectRatioButtons.forEach(b => b.classList.remove("is-active"));
+    setCropModeUI();
+  }
+}
+
+cropModeButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    cropModeChoice = btn.dataset.cropMode;
+    freeCropEnabled = true;
+    if (cropModeChoice === "free") {
+      cropRatioLock = null;
+      freeCrop = {
+        ...DEFAULT_FREE_CROP
+      };
+      aspectRatioButtons.forEach(b => b.classList.remove("is-active"));
+    } else if (cropModeChoice === "ratio") {
+      const active = aspectRatioButtons.find(b => b.classList.contains("is-active")) || aspectRatioButtons[0];
+      const [rw, rh] = active.dataset.ratio.split(":").map(Number);
+      cropRatioLock = {
+        w: rw,
+        h: rh
+      };
+      freeCrop = computeCenteredCropForRatio(rw, rh);
+      aspectRatioButtons.forEach(b => b.classList.toggle("is-active", b === active));
+      const colsChanged = colsSelect.value !== "1";
+      const rowsChanged = rowsSelect.value !== "1";
+      colsSelect.value = "1";
+      rowsSelect.value = "1";
+      if (colsChanged) colsSelect.dispatchEvent(new Event("change", {
+        bubbles: true
+      }));
+      if (rowsChanged) rowsSelect.dispatchEvent(new Event("change", {
+        bubbles: true
+      }));
+    }
+    cropHint.hidden = false;
+    setCropModeUI();
+    renderGuides();
+  });
+});
+
+blurModeButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    const prevMode = blurMode;
+    blurMode = btn.dataset.blur;
+    if (blurMode !== prevMode && (prevMode === "touch" || prevMode === "auto")) {
+      blurPaintCtx.clearRect(0, 0, blurPaintCanvas.width, blurPaintCanvas.height);
+      blurAutoAddCtx.clearRect(0, 0, blurAutoAddCanvas.width, blurAutoAddCanvas.height);
+    }
+    if (blurMode === "touch") {
+      canvasInteractionMode = "blur";
+    } else if (blurMode === "auto") {
+      computeAutoSubjectMask();
+    }
+    setBlurModeUI();
+    updateBlurPreview();
+  });
+});
+
+blurTypeButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    blurType = btn.dataset.blurType;
+    const range = BLUR_STRENGTH_RANGES[blurType];
+    blurStrengthInput.min = range.min;
+    blurStrengthInput.max = range.max;
+    blurStrengthInput.value = range.default;
+    blurStrength = range.default;
+    updateBlurStrengthFill();
+    setBlurTypeUI();
+    updateBlurPreview();
+  });
+});
+
+speedLinesToggle.addEventListener("change", () => {
+  if (speedLinesToggle.checked) {
+    canvasInteractionMode = "speedlines";
+  }
+  setSpeedLinesUI();
+  updateBlurPreview();
+});
+
+function setSpeedLinesActiveSwatch(activeEl) {
+  speedLinesColorSwatches.forEach(s => s.classList.toggle("is-active", s === activeEl));
+  speedLinesColorCustomSwatch.classList.toggle("is-active", activeEl === speedLinesColorCustomSwatch);
+}
+
+speedLinesColorSwatches.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    speedLinesColor = btn.dataset.color;
+    speedLinesColorPicker.value = speedLinesColor;
+    setSpeedLinesActiveSwatch(btn);
+    updateBlurPreview();
+  });
+});
+
+wireLiveColorInput(speedLinesColorPicker, () => {
+  speedLinesColor = speedLinesColorPicker.value;
+  setSpeedLinesActiveSwatch(speedLinesColorCustomSwatch);
+});
+
+function updateSpeedLinesCountFill() {
+  const pct = (speedLinesCountInput.value - speedLinesCountInput.min) / (speedLinesCountInput.max - speedLinesCountInput.min) * 100;
+  speedLinesCountInput.style.setProperty("--fill", pct + "%");
+}
+
+speedLinesCountInput.addEventListener("input", () => {
+  speedLinesCount = Number(speedLinesCountInput.value);
+  updateSpeedLinesCountFill();
+  updateBlurPreview();
+});
+
+function updateSpeedLinesThicknessFill() {
+  const pct = (speedLinesThicknessInput.value - speedLinesThicknessInput.min) / (speedLinesThicknessInput.max - speedLinesThicknessInput.min) * 100;
+  speedLinesThicknessInput.style.setProperty("--fill", pct + "%");
+}
+
+speedLinesThicknessInput.addEventListener("input", () => {
+  speedLinesThickness = Number(speedLinesThicknessInput.value);
+  updateSpeedLinesThicknessFill();
+  updateBlurPreview();
+});
+
+function updateSpeedLinesLengthFill() {
+  const pct = (speedLinesLengthInput.value - speedLinesLengthInput.min) / (speedLinesLengthInput.max - speedLinesLengthInput.min) * 100;
+  speedLinesLengthInput.style.setProperty("--fill", pct + "%");
+}
+
+speedLinesLengthInput.addEventListener("input", () => {
+  speedLinesLength = Number(speedLinesLengthInput.value);
+  updateSpeedLinesLengthFill();
+  updateBlurPreview();
+});
+
+function updateSpeedLinesOpacityFill() {
+  const pct = (speedLinesOpacityInput.value - speedLinesOpacityInput.min) / (speedLinesOpacityInput.max - speedLinesOpacityInput.min) * 100;
+  speedLinesOpacityInput.style.setProperty("--fill", pct + "%");
+}
+
+speedLinesOpacityInput.addEventListener("input", () => {
+  speedLinesOpacityPct = Number(speedLinesOpacityInput.value);
+  updateSpeedLinesOpacityFill();
+  updateBlurPreview();
+});
+
+function setSpeedLinesCenterFromEvent(e) {
+  const rect = previewStage.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+  speedLinesCenter = {
+    x: x,
+    y: y
+  };
+  updateSpeedLinesHandlePosition();
+}
+
+speedLinesHitarea.addEventListener("pointerdown", e => {
+  if (!speedLinesEnabled) return;
+  speedLinesDragging = true;
+  speedLinesHitarea.setPointerCapture(e.pointerId);
+  setSpeedLinesCenterFromEvent(e);
+  beginLiveOverlay();
+});
+
+speedLinesHitarea.addEventListener("pointermove", e => {
+  if (!speedLinesDragging) return;
+  setSpeedLinesCenterFromEvent(e);
+  scheduleLiveDraw();
+});
+
+speedLinesHitarea.addEventListener("pointerup", () => {
+  if (!speedLinesDragging) return;
+  speedLinesDragging = false;
+  endLiveOverlay();
+});
+
+speedLinesHitarea.addEventListener("pointercancel", () => {
+  speedLinesDragging = false;
+  endLiveOverlay();
+});
+
+textAddBtn.addEventListener("click", () => {
+  if (textAddBtn.disabled) return;
+  addTextLayer();
+  canvasInteractionMode = "text";
+  setTextUI();
+  updateBlurPreview();
+});
+
+textDeleteBtn.addEventListener("click", () => {
+  if (textDeleteBtn.disabled || activeTextIndex < 0) return;
+  removeTextLayer(activeTextIndex);
+});
+
+document.querySelectorAll("[data-text-preset]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    textContentInput.value = btn.dataset.textPreset;
+    textContentInput.dispatchEvent(new Event("input", {
+      bubbles: true
+    }));
+  });
+});
+
+textContentInput.addEventListener("input", () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.content = textContentInput.value;
+  renderTextLayerChips();
+  renderTextHandles();
+  setTextUI();
+  updateBlurPreview();
+});
+
+textFontButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    const t = getActiveText();
+    if (!t) return;
+    t.font = btn.dataset.font;
+    textFontButtons.forEach(b => b.classList.toggle("is-active", b === btn));
+    updateBlurPreview();
+  });
+});
+
+function setTextActiveSwatch(activeEl) {
+  textColorSwatches.forEach(s => s.classList.toggle("is-active", s === activeEl));
+  textColorCustomSwatch.classList.toggle("is-active", activeEl === textColorCustomSwatch);
+}
+
+textColorSwatches.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    const t = getActiveText();
+    if (!t) return;
+    t.color = btn.dataset.color;
+    textColorPicker.value = t.color;
+    setTextActiveSwatch(btn);
+    updateBlurPreview();
+  });
+});
+
+wireLiveColorInput(textColorPicker, () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.color = textColorPicker.value;
+  setTextActiveSwatch(textColorCustomSwatch);
+});
+
+function setTextOutlineActiveSwatch(activeEl) {
+  textOutlineColorSwatches.forEach(s => s.classList.toggle("is-active", s === activeEl));
+  textOutlineColorCustomSwatch.classList.toggle("is-active", activeEl === textOutlineColorCustomSwatch);
+}
+
+textOutlineModeButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    const t = getActiveText();
+    if (!t) return;
+    t.outline = btn.dataset.outline;
+    textOutlineModeButtons.forEach(b => b.classList.toggle("is-active", b === btn));
+    textOutlineColorRow.hidden = t.outline !== "custom";
+    updateBlurPreview();
+  });
+});
+
+textOutlineColorSwatches.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    const t = getActiveText();
+    if (!t) return;
+    t.outlineColor = btn.dataset.color;
+    textOutlineColorPicker.value = t.outlineColor;
+    setTextOutlineActiveSwatch(btn);
+    updateBlurPreview();
+  });
+});
+
+wireLiveColorInput(textOutlineColorPicker, () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.outlineColor = textOutlineColorPicker.value;
+  setTextOutlineActiveSwatch(textOutlineColorCustomSwatch);
+});
+
+textShadowToggle.addEventListener("change", () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.shadow = textShadowToggle.checked;
+  syncTextControlsFromActive();
+  updateBlurPreview();
+});
+
+textShadowColorSwatches.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    const t = getActiveText();
+    if (!t) return;
+    t.shadowColor = btn.dataset.color;
+    textShadowColorPicker.value = t.shadowColor;
+    textShadowColorSwatches.forEach(b => b.classList.toggle("is-active", b === btn));
+    textShadowColorCustomSwatch.classList.remove("is-active");
+    updateBlurPreview();
+  });
+});
+
+wireLiveColorInput(textShadowColorPicker, () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.shadowColor = textShadowColorPicker.value;
+  textShadowColorSwatches.forEach(b => b.classList.remove("is-active"));
+  textShadowColorCustomSwatch.classList.add("is-active");
+});
+
+textShadowDistanceInput.addEventListener("input", () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.shadowDistance = Number(textShadowDistanceInput.value);
+  updateBlurPreview();
+});
+
+textShadowBlurInput.addEventListener("input", () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.shadowBlur = Number(textShadowBlurInput.value);
+  updateBlurPreview();
+});
+
+function updateTextSizeFill() {
+  const pct = (textSizeInput.value - textSizeInput.min) / (textSizeInput.max - textSizeInput.min) * 100;
+  textSizeInput.style.setProperty("--fill", pct + "%");
+}
+
+textSizeInput.addEventListener("input", () => {
+  const t = getActiveText();
+  if (!t) return;
+  t.size = Number(textSizeInput.value);
+  updateTextSizeFill();
+  updateBlurPreview();
+});
+
+function setTextPositionFromEvent(e, index) {
+  const rect = previewStage.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+  texts[index].position = {
+    x: x,
+    y: y
+  };
+  renderTextHandles();
+}
+
+previewStage.addEventListener("pointerdown", e => {
+  const handle = e.target.closest(".text-position-handle-dyn");
+  if (!handle) return;
+  const index = Number(handle.dataset.textIndex);
+  if (index !== activeTextIndex) selectTextLayer(index);
+  draggingTextIndex = index;
+  textDragging = true;
+  handle.setPointerCapture(e.pointerId);
+  e.stopPropagation();
+});
+
+previewStage.addEventListener("pointermove", e => {
+  if (!textDragging || draggingTextIndex < 0) return;
+  setTextPositionFromEvent(e, draggingTextIndex);
+  scheduleBlurPreviewUpdate();
+});
+
+previewStage.addEventListener("pointerup", () => {
+  if (!textDragging) return;
+  textDragging = false;
+  draggingTextIndex = -1;
+  updateBlurPreview();
+});
+
+textHitarea.addEventListener("pointerdown", e => {
+  if (activeTextIndex < 0) return;
+  textDragging = true;
+  draggingTextIndex = activeTextIndex;
+  textHitarea.setPointerCapture(e.pointerId);
+  setTextPositionFromEvent(e, activeTextIndex);
+  beginLiveOverlay();
+});
+
+textHitarea.addEventListener("pointermove", e => {
+  if (!textDragging || draggingTextIndex < 0) return;
+  setTextPositionFromEvent(e, draggingTextIndex);
+  scheduleLiveDraw();
+});
+
+textHitarea.addEventListener("pointerup", () => {
+  if (!textDragging) return;
+  textDragging = false;
+  draggingTextIndex = -1;
+  endLiveOverlay();
+});
+
+textHitarea.addEventListener("pointercancel", () => {
+  textDragging = false;
+  draggingTextIndex = -1;
+  endLiveOverlay();
+});
+
+brightnessPresetButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    brightnessPreset = btn.dataset.brightness;
+    setBrightnessUI();
+    updateBlurPreview();
+  });
+});
+
+brightnessRangeButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    brightnessRange = btn.dataset.brightnessRange;
+    if (brightnessRange !== "whole") computeAutoSubjectMask();
+    setBrightnessUI();
+    updateBlurPreview();
+  });
+});
+
+function updateBrightnessIntensityFill() {
+  const pct = (brightnessIntensityInput.value - brightnessIntensityInput.min) / (brightnessIntensityInput.max - brightnessIntensityInput.min) * 100;
+  brightnessIntensityInput.style.setProperty("--fill", pct + "%");
+}
+
+brightnessIntensityInput.addEventListener("input", () => {
+  brightnessIntensity = Number(brightnessIntensityInput.value);
+  updateBrightnessIntensityFill();
+  updateBlurPreview();
+});
+
+function updateBlurStrengthFill() {
+  const pct = (blurStrengthInput.value - blurStrengthInput.min) / (blurStrengthInput.max - blurStrengthInput.min) * 100;
+  blurStrengthInput.style.setProperty("--fill", pct + "%");
+}
+
+blurStrengthInput.addEventListener("input", () => {
+  blurStrength = Number(blurStrengthInput.value);
+  updateBlurStrengthFill();
+  updateBlurPreview();
+});
+
+function updateBlurBrushFill() {
+  const pct = (blurBrushInput.value - blurBrushInput.min) / (blurBrushInput.max - blurBrushInput.min) * 100;
+  blurBrushInput.style.setProperty("--fill", pct + "%");
+}
+
+blurBrushInput.addEventListener("input", () => {
+  blurBrushSize = Number(blurBrushInput.value);
+  updateBlurBrushFill();
+});
+
+function updateBlurRangeFill() {
+  const pct = (blurRangeInput.value - blurRangeInput.min) / (blurRangeInput.max - blurRangeInput.min) * 100;
+  blurRangeInput.style.setProperty("--fill", pct + "%");
+}
+
+blurRangeInput.addEventListener("input", () => {
+  blurRange = Number(blurRangeInput.value);
+  updateBlurRangeFill();
+  renderBlurBoundary();
+  updateBlurPreview();
+});
+
+cmTabButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.hidden) return;
+    canvasInteractionMode = btn.dataset.canvasMode;
+    updateHideHandlesVisibility();
+  });
+});
+
+blurAutoBrushButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    autoBrushMode = btn.dataset.autoBrush;
+    blurAutoBrushButtons.forEach(b => b.classList.toggle("is-active", b === btn));
+    setBlurModeUI();
+  });
+});
+
+blurClearBtn.addEventListener("click", () => {
+  blurPaintCtx.clearRect(0, 0, blurPaintCanvas.width, blurPaintCanvas.height);
+  blurAutoAddCtx.clearRect(0, 0, blurAutoAddCanvas.width, blurAutoAddCanvas.height);
+  updateBlurPreview();
+});
+
+function activeBrushCtx() {
+  return blurMode === "auto" && autoBrushMode === "add" ? blurAutoAddCtx : blurPaintCtx;
+}
+
+let blurBrushLastPoint = null;
+
+function strokeBrushPath(ctx, x, y, radius, alpha) {
+  ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+  if (blurBrushLastPoint) {
+    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+    ctx.lineWidth = radius * 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(blurBrushLastPoint.x, blurBrushLastPoint.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function paintBlurAt(clientX, clientY) {
+  const rect = blurPaintCanvas.getBoundingClientRect();
+  const scaleX = blurPaintCanvas.width / rect.width;
+  const scaleY = blurPaintCanvas.height / rect.height;
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
+  const radius = blurBrushSize / 2 * ((scaleX + scaleY) / 2);
+  strokeBrushPath(activeBrushCtx(), x, y, radius, .9);
+  if (blurMode === "auto") {
+    const otherCtx = autoBrushMode === "add" ? blurPaintCtx : blurAutoAddCtx;
+    otherCtx.save();
+    otherCtx.globalCompositeOperation = "destination-out";
+    strokeBrushPath(otherCtx, x, y, radius, 1);
+    otherCtx.restore();
+  }
+  blurBrushLastPoint = {
+    x: x,
+    y: y
+  };
+}
+
+let blurPreviewRafPending = false;
+
+function scheduleBlurPreviewUpdate() {
+  if (blurPreviewRafPending) return;
+  blurPreviewRafPending = true;
+  requestAnimationFrame(() => {
+    blurPreviewRafPending = false;
+    updateBlurPreview();
+  });
+}
+
+blurPaintCanvas.addEventListener("pointerdown", e => {
+  if (blurMode !== "touch" && blurMode !== "auto") return;
+  blurPainting = true;
+  blurBrushLastPoint = null;
+  blurPaintCanvas.setPointerCapture(e.pointerId);
+  paintBlurAt(e.clientX, e.clientY);
+  scheduleBlurPreviewUpdate();
+});
+
+blurPaintCanvas.addEventListener("pointermove", e => {
+  updateBrushCursor(e.clientX, e.clientY);
+  if (!blurPainting) return;
+  paintBlurAt(e.clientX, e.clientY);
+  scheduleBlurPreviewUpdate();
+});
+
+blurPaintCanvas.addEventListener("pointerup", () => {
+  if (!blurPainting) return;
+  blurPainting = false;
+  blurBrushLastPoint = null;
+  updateBlurPreview();
+});
+
+blurPaintCanvas.addEventListener("pointercancel", () => {
+  blurPainting = false;
+  blurBrushLastPoint = null;
+});
+
+blurPaintCanvas.addEventListener("pointerenter", e => {
+  updateBrushCursor(e.clientX, e.clientY);
+});
+
+blurPaintCanvas.addEventListener("pointerleave", () => {
+  blurBrushCursor.style.display = "none";
+});
+
+function updateBrushCursor(clientX, clientY) {
+  if (blurMode !== "touch" && blurMode !== "auto") {
+    blurBrushCursor.style.display = "none";
+    return;
+  }
+  const rect = previewStage.getBoundingClientRect();
+  blurBrushCursor.style.display = "block";
+  blurBrushCursor.style.width = blurBrushSize + "px";
+  blurBrushCursor.style.height = blurBrushSize + "px";
+  blurBrushCursor.style.left = clientX - rect.left + "px";
+  blurBrushCursor.style.top = clientY - rect.top + "px";
+}
+
+function updateCropRatioFill() {
+  const pct = (cropRatioInput.value - cropRatioInput.min) / (cropRatioInput.max - cropRatioInput.min) * 100;
+  cropRatioInput.style.setProperty("--fill", pct + "%");
+}
+
+cropRatioInput.addEventListener("input", () => {
+  cropRatio = Number(cropRatioInput.value) / 100;
+  cropRatioValue.textContent = cropRatio.toFixed(2);
+  updateCropRatioFill();
+  renderMasks();
+});
+
+resetCropBtn.addEventListener("click", () => {
+  cropRatio = DEFAULT_CROP_RATIO;
+  cropRatioInput.value = Math.round(DEFAULT_CROP_RATIO * 100);
+  cropRatioValue.textContent = DEFAULT_CROP_RATIO.toFixed(2);
+  updateCropRatioFill();
+  renderMasks();
+});
+
+resetGuidesBtn.addEventListener("click", () => {
+  colsSelect.value = "3";
+  rowsSelect.value = "1";
+  updateColsIconUI();
+  updateRowsIconUI();
+  mode = "free";
+  lastNonFreeMode = "x";
+  freeCropEnabled = false;
+  freeCrop = {
+    x0: 0,
+    y0: 0,
+    x1: 1,
+    y1: 1
+  };
+  cropModeChoice = "free";
+  cropRatioLock = null;
+  aspectRatioButtons.forEach(b => b.classList.remove("is-active"));
+  cropRatioInput.value = 204;
+  cropTopFrac = .5;
+  groupStart = 0;
+  groupWidth = 1;
+  colPositions = evenSplits(3);
+  rowPositions = evenSplits(1);
+  updateCropRatioFill();
+  setCropModeUI();
+  updateModeAvailability();
+  renderGuides();
+});
+
+previewStage.addEventListener("pointerdown", e => {
+  const target = e.target.closest(".guide, .group-handle, .nub-btn, .crop-handle, .free-crop-window");
+  if (!target || target.classList.contains("is-disabled")) return;
+  if (target.dataset.role === "linked-divider") {
+    const index0 = Number(target.dataset.index);
+    const cols = Number(colsSelect.value);
+    const sliceWidthFrac = groupWidth / cols;
+    const startPos = groupStart + sliceWidthFrac * (index0 + 1);
+    dragging = {
+      kind: "linked-divider",
+      index: index0,
+      anchor: null,
+      startPos: startPos
+    };
+  } else if (target.classList.contains("crop-handle")) {
+    const cropRole = target.dataset.role.replace("fcrop-", "");
+    const gr = previewStage.getBoundingClientRect();
+    const trueX = cropRole === "tl" || cropRole === "left" || cropRole === "bl" ? freeCrop.x0 : cropRole === "tr" || cropRole === "right" || cropRole === "br" ? freeCrop.x1 : null;
+    const trueY = cropRole === "tl" || cropRole === "top" || cropRole === "tr" ? freeCrop.y0 : cropRole === "bl" || cropRole === "bottom" || cropRole === "br" ? freeCrop.y1 : null;
+    dragging = {
+      kind: "free-crop",
+      role: cropRole,
+      offX: trueX === null ? 0 : (e.clientX - gr.left) / gr.width - trueX,
+      offY: trueY === null ? 0 : (e.clientY - gr.top) / gr.height - trueY
+    };
+  } else if (target.classList.contains("free-crop-window") || target.dataset.role === "free-crop-move") {
+    dragging = {
+      kind: "free-crop-move",
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startRect: {
+        ...freeCrop
+      }
+    };
+  } else if (target.classList.contains("guide")) {
+    dragging = {
+      kind: "guide",
+      axis: target.dataset.axis,
+      index: Number(target.dataset.index)
+    };
+  } else if (target.dataset.role === "linked-move") {
+    const info = getCropInfo();
+    dragging = {
+      kind: "linked-move",
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startGroupStart: groupStart,
+      startCropTop: info ? info.top : 0,
+      maxOffset: info ? info.maxOffset : 0
+    };
+  }
+  if (dragging) target.setPointerCapture(e.pointerId);
+});
+
+const MIN_GROUP_WIDTH = .12;
+
+previewStage.addEventListener("pointermove", e => {
+  if (!dragging || !loadedImage) return;
+  const rect = previewStage.getBoundingClientRect();
+  if (dragging.kind === "guide") {
+    const positions = dragging.axis === "col" ? colPositions : rowPositions;
+    const size = dragging.axis === "col" ? rect.width : rect.height;
+    const start = dragging.axis === "col" ? rect.left : rect.top;
+    const client = dragging.axis === "col" ? e.clientX : e.clientY;
+    const rawFrac = (client - start) / size;
+    let localFrac = rawFrac;
+    if (isFreeCropActive()) {
+      const lo = dragging.axis === "col" ? freeCrop.x0 : freeCrop.y0;
+      const hi = dragging.axis === "col" ? freeCrop.x1 : freeCrop.y1;
+      localFrac = (rawFrac - lo) / (hi - lo);
+    }
+    const prev = dragging.index === 0 ? 0 : positions[dragging.index - 1];
+    const next = dragging.index === positions.length - 1 ? 1 : positions[dragging.index + 1];
+    const margin = .04;
+    const pos = Math.min(next - margin, Math.max(prev + margin, localFrac));
+    positions[dragging.index] = pos;
+    const guide = previewStage.querySelector(`.guide[data-axis="${dragging.axis}"][data-index="${dragging.index}"]`);
+    const screenFrac = dragging.axis === "col" ? cropX(pos) : cropY(pos);
+    if (guide) guide.style[dragging.axis === "col" ? "left" : "top"] = screenFrac * 100 + "%";
+    return;
+  }
+  if (dragging.kind === "free-crop") {
+    const fx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width - (dragging.offX || 0)));
+    const fy = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height - (dragging.offY || 0)));
+    const role = dragging.role;
+    if (cropRatioLock && loadedImage) {
+      const imgW = loadedImage.width, imgH = loadedImage.height;
+      const targetRatio = cropRatioLock.w / cropRatioLock.h;
+      const anchor = {
+        tl: {
+          x: freeCrop.x1,
+          y: freeCrop.y1
+        },
+        tr: {
+          x: freeCrop.x0,
+          y: freeCrop.y1
+        },
+        bl: {
+          x: freeCrop.x1,
+          y: freeCrop.y0
+        },
+        br: {
+          x: freeCrop.x0,
+          y: freeCrop.y0
+        }
+      }[role];
+      if (anchor) {
+        const signX = role === "tr" || role === "br" ? 1 : -1;
+        const signY = role === "bl" || role === "br" ? 1 : -1;
+        const dxPx = (fx - anchor.x) * imgW;
+        const dyPx = (fy - anchor.y) * imgH;
+        const wFromX = Math.abs(dxPx), hFromX = wFromX / targetRatio;
+        const hFromY = Math.abs(dyPx), wFromY = hFromY * targetRatio;
+        const useX = wFromX * hFromX >= wFromY * hFromY;
+        let finalWpx = useX ? wFromX : wFromY;
+        let finalHpx = useX ? hFromX : hFromY;
+        const maxWpx = signX > 0 ? imgW - anchor.x * imgW : anchor.x * imgW;
+        const maxHpx = signY > 0 ? imgH - anchor.y * imgH : anchor.y * imgH;
+        if (finalWpx > maxWpx) {
+          finalWpx = maxWpx;
+          finalHpx = finalWpx / targetRatio;
+        }
+        if (finalHpx > maxHpx) {
+          finalHpx = maxHpx;
+          finalWpx = finalHpx * targetRatio;
+        }
+        const minPx = FREE_CROP_MIN_SIZE * Math.min(imgW, imgH);
+        if (finalWpx < minPx) {
+          finalWpx = minPx;
+          finalHpx = minPx / targetRatio;
+        }
+        if (finalHpx < minPx) {
+          finalHpx = minPx;
+          finalWpx = minPx * targetRatio;
+        }
+        let newX = anchor.x + signX * (finalWpx / imgW);
+        let newY = anchor.y + signY * (finalHpx / imgH);
+        newX = Math.min(1, Math.max(0, newX));
+        newY = Math.min(1, Math.max(0, newY));
+        freeCrop = {
+          x0: Math.min(anchor.x, newX),
+          x1: Math.max(anchor.x, newX),
+          y0: Math.min(anchor.y, newY),
+          y1: Math.max(anchor.y, newY)
+        };
+      }
+      updateFreeCropVisualsLive();
+      return;
+    }
+    if (role === "tl" || role === "left" || role === "bl") freeCrop.x0 = Math.min(freeCrop.x1 - FREE_CROP_MIN_SIZE, fx);
+    if (role === "tr" || role === "right" || role === "br") freeCrop.x1 = Math.max(freeCrop.x0 + FREE_CROP_MIN_SIZE, fx);
+    if (role === "tl" || role === "top" || role === "tr") freeCrop.y0 = Math.min(freeCrop.y1 - FREE_CROP_MIN_SIZE, fy);
+    if (role === "bl" || role === "bottom" || role === "br") freeCrop.y1 = Math.max(freeCrop.y0 + FREE_CROP_MIN_SIZE, fy);
+    updateFreeCropVisualsLive();
+    return;
+  }
+  if (dragging.kind === "free-crop-move") {
+    const w = dragging.startRect.x1 - dragging.startRect.x0;
+    const h = dragging.startRect.y1 - dragging.startRect.y0;
+    const dxFrac = (e.clientX - dragging.startClientX) / rect.width;
+    const dyFrac = (e.clientY - dragging.startClientY) / rect.height;
+    const newX0 = Math.min(1 - w, Math.max(0, dragging.startRect.x0 + dxFrac));
+    const newY0 = Math.min(1 - h, Math.max(0, dragging.startRect.y0 + dyFrac));
+    freeCrop = {
+      x0: newX0,
+      y0: newY0,
+      x1: newX0 + w,
+      y1: newY0 + h
+    };
+    updateFreeCropVisualsLive();
+    return;
+  }
+  if (dragging.kind === "linked-divider") {
+    const rawFraction = (e.clientX - rect.left) / rect.width;
+    if (!dragging.anchor) {
+      const DIRECTION_THRESHOLD = .003;
+      if (rawFraction > dragging.startPos + DIRECTION_THRESHOLD) {
+        dragging.anchor = {
+          side: "right",
+          value: groupStart + groupWidth
+        };
+      } else if (rawFraction < dragging.startPos - DIRECTION_THRESHOLD) {
+        dragging.anchor = {
+          side: "left",
+          value: groupStart
+        };
+      } else {
+        return;
+      }
+    }
+    applyLinkedDividerDrag(dragging.index, rawFraction, dragging.anchor);
+    updateGroupVisualsLive();
+    return;
+  }
+  if (dragging.kind === "linked-move") {
+    const deltaXFrac = (e.clientX - dragging.startClientX) / rect.width;
+    groupStart = Math.min(1 - groupWidth, Math.max(0, dragging.startGroupStart + deltaXFrac));
+    if (dragging.maxOffset > 0) {
+      const deltaYPx = (e.clientY - dragging.startClientY) / rect.height * loadedImage.height;
+      const newTop = Math.min(dragging.maxOffset, Math.max(0, dragging.startCropTop + deltaYPx));
+      cropTopFrac = newTop / dragging.maxOffset;
+    }
+    updateGroupVisualsLive();
+    return;
+  }
+});
+
+function endDrag() {
+  dragging = null;
+}
+
+previewStage.addEventListener("pointerup", endDrag);
+
+previewStage.addEventListener("pointercancel", endDrag);
+
+const DOWNLOAD_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/></svg>';
+
+splitBtn.addEventListener("click", async () => {
+  if (!loadedImage) return;
+  if (blurMode === "auto" && !autoSubjectMaskCanvas) {
+    splitBtn.disabled = true;
+    await computeAutoSubjectMask();
+    splitBtn.disabled = false;
+    if (!autoSubjectMaskCanvas) return;
+  }
+  const img = getRenderSource();
+  resultGrid.innerHTML = "";
+  if (isLinked()) {
+    const cols = Number(colsSelect.value);
+    const sliceWidthFrac = groupWidth / cols;
+    const xs = Array.from({
+      length: cols + 1
+    }, (_, i) => Math.round((groupStart + sliceWidthFrac * i) * img.width));
+    const cropInfo = getCropInfo();
+    const ys = cropInfo ? [ cropInfo.top, cropInfo.top + cropInfo.targetHeightPx ] : [ 0, img.height ];
+    const strip = document.createElement("div");
+    strip.className = "result-strip";
+    for (let col = 0; col < cols; col++) {
+      appendSlice(strip, img, xs[col], ys[0], xs[col + 1] - xs[col], ys[1] - ys[0], 0, col);
+    }
+    resultGrid.appendChild(strip);
+  } else {
+    const xs = [ 0, ...colPositions, 1 ].map(p => Math.round(cropX(p) * img.width));
+    const ys = [ 0, ...rowPositions, 1 ].map(p => Math.round(cropY(p) * img.height));
+    for (let row = 0; row < ys.length - 1; row++) {
+      const strip = document.createElement("div");
+      strip.className = "result-strip";
+      for (let col = 0; col < xs.length - 1; col++) {
+        appendSlice(strip, img, xs[col], ys[row], xs[col + 1] - xs[col], ys[row + 1] - ys[row], row, col);
+      }
+      resultGrid.appendChild(strip);
+    }
+  }
+  resultsPanel.hidden = false;
+  resultsPanel.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+});
+
+function appendSlice(strip, img, x, y, w, h, row, col) {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext("2d").drawImage(img, x, y, w, h, 0, 0, w, h);
+  const card = document.createElement("div");
+  card.className = "result-card";
+  const dataUrl = canvas.toDataURL("image/png");
+  card.innerHTML = `<img src="${dataUrl}" alt="slice" /><a class="dl-btn" href="${dataUrl}" download="yuzugene_${row + 1}_${col + 1}.png" aria-label="ダウンロード">${DOWNLOAD_ICON}</a>`;
+  strip.appendChild(card);
+}
+
+const resetBtnLabel = resetBtn.querySelector("span");
+
+const RESET_LABEL = resetBtnLabel.textContent;
+
+let resetConfirmTimer = null;
+
+function cancelResetConfirm() {
+  clearTimeout(resetConfirmTimer);
+  resetBtn.classList.remove("is-confirming");
+  resetBtnLabel.textContent = RESET_LABEL;
+}
+
+resetBtn.addEventListener("click", () => {
+  if (resetBtn.classList.contains("is-confirming")) {
+    location.reload();
+    return;
+  }
+  resetBtn.classList.add("is-confirming");
+  resetBtnLabel.textContent = "もう一度押して初期化";
+  resetConfirmTimer = setTimeout(cancelResetConfirm, 3e3);
+});
+
+updateModeAvailability();
+
+updateColsIconUI();
+
+updateRowsIconUI();
+
+updateCropRatioFill();
+
+updateBlurStrengthFill();
+
+updateBlurRangeFill();
+
+updateBlurBrushFill();
+
+setBlurModeUI();
+
+setBlurTypeUI();
+
+updateSpeedLinesCountFill();
+
+updateSpeedLinesThicknessFill();
+
+updateSpeedLinesLengthFill();
+
+updateSpeedLinesOpacityFill();
+
+setSpeedLinesUI();
+
+updateTextSizeFill();
+
+renderTextLayerChips();
+
+syncTextControlsFromActive();
+
+setTextUI();
+
+updateBrightnessIntensityFill();
+
+setBrightnessUI();
+
+setEffectTabUI();
+
+Object.values(categoryPanels).forEach(panel => {
+  panel.addEventListener("scroll", updateMobileScrollFade);
+});
+
+if (window.ResizeObserver) {
+  const scrollFadeObserver = new ResizeObserver(() => updateMobileScrollFade());
+  Object.values(categoryPanels).forEach(panel => scrollFadeObserver.observe(panel));
+}
+
+window.addEventListener("resize", updateMobileScrollFade);
+
+const categoryNavEl = document.getElementById("category-nav");
+
+function syncNavHeight() {
+  document.documentElement.style.setProperty("--nav-h", categoryNavEl.getBoundingClientRect().height + "px");
+}
+
+if (window.ResizeObserver) new ResizeObserver(syncNavHeight).observe(categoryNavEl);
+
+window.addEventListener("resize", syncNavHeight);
+
+syncNavHeight();
+
+(function initSliderReadouts() {
+  document.querySelectorAll('.slider-field input[type="range"]').forEach(input => {
+    const label = input.closest(".slider-field").querySelector(".slider-label");
+    if (!label) return;
+    const out = document.createElement("output");
+    out.className = "slider-value";
+    out.setAttribute("for", input.id);
+    const chip = label.querySelector(".reset-chip");
+    label.insertBefore(out, chip || null);
+    const sync = () => {
+      const scale = Number(input.dataset.scale || 1);
+      const dec = Number(input.dataset.decimals || 0);
+      out.textContent = (Number(input.value) * scale).toFixed(dec) + (input.dataset.unit || "");
+    };
+    input.addEventListener("input", sync);
+    new MutationObserver(sync).observe(input, {
+      attributes: true,
+      attributeFilter: [ "style" ]
+    });
+    sync();
+  });
+})();
+</script>
+</body>
+</html>
