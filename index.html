@@ -230,6 +230,11 @@
   .preview-stage:not([data-category="crop"]) .free-crop-window {
     display: none;
   }
+  
+  .preview-stage:not([data-category="effects"]) .blur-boundary-h,
+  .preview-stage:not([data-category="effects"]) .blur-boundary-circle {
+    display: none !important;
+  }
 
   
   .preview-stage[data-canvas-mode="blur"] .guide, .preview-stage[data-canvas-mode="blur"] .group-handle,
@@ -2262,6 +2267,22 @@ function scheduleLiveDraw() {
   });
 }
 
+function wireLiveRangeInput(input, onChange) {
+  let settleTimer = null;
+  input.addEventListener("input", () => {
+    onChange();
+    if (!liveActive) beginLiveOverlay(); else scheduleLiveDraw();
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      if (liveActive) endLiveOverlay();
+    }, 400);
+  });
+  input.addEventListener("change", () => {
+    clearTimeout(settleTimer);
+    if (liveActive) endLiveOverlay();
+  });
+}
+
 function wireLiveColorInput(input, onChange) {
   let settleTimer = null;
   input.addEventListener("input", () => {
@@ -3319,10 +3340,9 @@ function updateSpeedLinesCountFill() {
   speedLinesCountInput.style.setProperty("--fill", pct + "%");
 }
 
-speedLinesCountInput.addEventListener("input", () => {
+wireLiveRangeInput(speedLinesCountInput, () => {
   speedLinesCount = Number(speedLinesCountInput.value);
   updateSpeedLinesCountFill();
-  updateBlurPreview();
 });
 
 function updateSpeedLinesThicknessFill() {
@@ -3330,10 +3350,9 @@ function updateSpeedLinesThicknessFill() {
   speedLinesThicknessInput.style.setProperty("--fill", pct + "%");
 }
 
-speedLinesThicknessInput.addEventListener("input", () => {
+wireLiveRangeInput(speedLinesThicknessInput, () => {
   speedLinesThickness = Number(speedLinesThicknessInput.value);
   updateSpeedLinesThicknessFill();
-  updateBlurPreview();
 });
 
 function updateSpeedLinesLengthFill() {
@@ -3341,10 +3360,9 @@ function updateSpeedLinesLengthFill() {
   speedLinesLengthInput.style.setProperty("--fill", pct + "%");
 }
 
-speedLinesLengthInput.addEventListener("input", () => {
+wireLiveRangeInput(speedLinesLengthInput, () => {
   speedLinesLength = Number(speedLinesLengthInput.value);
   updateSpeedLinesLengthFill();
-  updateBlurPreview();
 });
 
 function updateSpeedLinesOpacityFill() {
@@ -3352,10 +3370,9 @@ function updateSpeedLinesOpacityFill() {
   speedLinesOpacityInput.style.setProperty("--fill", pct + "%");
 }
 
-speedLinesOpacityInput.addEventListener("input", () => {
+wireLiveRangeInput(speedLinesOpacityInput, () => {
   speedLinesOpacityPct = Number(speedLinesOpacityInput.value);
   updateSpeedLinesOpacityFill();
-  updateBlurPreview();
 });
 
 function setSpeedLinesCenterFromEvent(e) {
@@ -3527,18 +3544,16 @@ wireLiveColorInput(textShadowColorPicker, () => {
   textShadowColorCustomSwatch.classList.add("is-active");
 });
 
-textShadowDistanceInput.addEventListener("input", () => {
+wireLiveRangeInput(textShadowDistanceInput, () => {
   const t = getActiveText();
   if (!t) return;
   t.shadowDistance = Number(textShadowDistanceInput.value);
-  updateBlurPreview();
 });
 
-textShadowBlurInput.addEventListener("input", () => {
+wireLiveRangeInput(textShadowBlurInput, () => {
   const t = getActiveText();
   if (!t) return;
   t.shadowBlur = Number(textShadowBlurInput.value);
-  updateBlurPreview();
 });
 
 function updateTextSizeFill() {
@@ -3642,10 +3657,9 @@ function updateBrightnessIntensityFill() {
   brightnessIntensityInput.style.setProperty("--fill", pct + "%");
 }
 
-brightnessIntensityInput.addEventListener("input", () => {
+wireLiveRangeInput(brightnessIntensityInput, () => {
   brightnessIntensity = Number(brightnessIntensityInput.value);
   updateBrightnessIntensityFill();
-  updateBlurPreview();
 });
 
 function updateBlurStrengthFill() {
@@ -3653,10 +3667,9 @@ function updateBlurStrengthFill() {
   blurStrengthInput.style.setProperty("--fill", pct + "%");
 }
 
-blurStrengthInput.addEventListener("input", () => {
+wireLiveRangeInput(blurStrengthInput, () => {
   blurStrength = Number(blurStrengthInput.value);
   updateBlurStrengthFill();
-  updateBlurPreview();
 });
 
 function updateBlurBrushFill() {
@@ -3674,11 +3687,10 @@ function updateBlurRangeFill() {
   blurRangeInput.style.setProperty("--fill", pct + "%");
 }
 
-blurRangeInput.addEventListener("input", () => {
+wireLiveRangeInput(blurRangeInput, () => {
   blurRange = Number(blurRangeInput.value);
   updateBlurRangeFill();
   renderBlurBoundary();
-  updateBlurPreview();
 });
 
 cmTabButtons.forEach(btn => {
