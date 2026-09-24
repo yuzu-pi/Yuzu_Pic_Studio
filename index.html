@@ -195,8 +195,8 @@
     .category-panel {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
       background: #ffffff; border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.16);
-      max-height: 46vh; overflow-y: auto; margin: 0 !important;
-      padding: 22px 16px calc(var(--nav-h, 78px) + 8px);
+      max-height: 38vh; overflow-y: auto; margin: 0 !important;
+      padding: 0 16px calc(var(--nav-h, 78px) + 8px);
       transform: translateY(100%); transition: transform 0.22s ease, max-height 0.22s ease;
       
       -webkit-mask-image: -webkit-radial-gradient(white, black);
@@ -204,11 +204,19 @@
     }
     .category-panel:not([hidden]) { transform: translateY(0); }
     
-    .category-panel.is-collapsed { max-height: calc(var(--nav-h, 78px) + 38px); overflow: hidden; }
+    .category-panel.is-collapsed {
+      
+      max-height: var(--grip-h, 46px); overflow: hidden;
+      padding-top: 0; padding-bottom: 0;
+      
+      bottom: var(--nav-h, 78px);
+    }
     
     .panel-grip {
       position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; width: 100%;
-      margin: 0; padding: 14px 0 6px; background: #ffffff; border: none; cursor: pointer; touch-action: none;
+      margin: 0; background: #ffffff; border: none; cursor: pointer; touch-action: none;
+      
+      padding: 36px 0 6px;
       
       box-shadow: 0 6px 6px -6px rgba(0, 0, 0, 0.35);
     }
@@ -503,6 +511,8 @@
   .hint { margin: 0; color: var(--text-muted); font-size: 0.75rem; line-height: 1.7; }
   #image-size-hint b { color: var(--ink); font-weight: 600; }
   .hint-with-icon { display: flex; align-items: center; gap: 5px; }
+  
+  .hint-with-icon[hidden] { display: none; }
   .hint-with-icon svg { width: 14px; height: 14px; flex-shrink: 0; }
 
   
@@ -4247,6 +4257,16 @@ if (window.ResizeObserver) new ResizeObserver(syncNavHeight).observe(categoryNav
 window.addEventListener("resize", syncNavHeight);
 
 syncNavHeight();
+
+function syncGripHeight() {
+  document.documentElement.style.setProperty("--grip-h", panelGrip.getBoundingClientRect().height + "px");
+}
+
+if (window.ResizeObserver) new ResizeObserver(syncGripHeight).observe(panelGrip);
+
+window.addEventListener("resize", syncGripHeight);
+
+syncGripHeight();
 
 (function initSliderReadouts() {
   document.querySelectorAll('.slider-field input[type="range"]').forEach(input => {
